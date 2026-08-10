@@ -166,6 +166,8 @@
   let cueVideoId = "";       // videoId the cues belong to
   let cueTimer = null;       // currentTime-driven loop
   let activeCueIdx = -1;     // index of currently shown cue
+  let cuePairActive = false; // cue mode renders the previous + current cue
+  let previousCueIdx = -1;   // previous cue shown above the highlighted current cue
   let cueEpoch = 0;          // bumped each (re)start/teardown; invalidates in-flight gtx
   const transCache = new Map(); // key `${videoId} ${idx}` (per-cue) or `${videoId} g${gIdx}` (group)
   const transInflight = new Set(); // in-flight gtx dedupe: cue idx (number) or "g"+gIdx (string)
@@ -408,6 +410,10 @@
     transEl.className = "ytds-line ytds-trans";
     origEl = document.createElement("div");
     origEl.className = "ytds-line ytds-orig";
+    origEl.addEventListener("pointerdown", stopCuePointerPropagation);
+    origEl.addEventListener("pointerup", stopCuePointerPropagation);
+    origEl.addEventListener("click", stopCuePointerPropagation);
+    origEl.addEventListener("dblclick", selectCurrentCue);
 
     overlay.appendChild(transEl);
     overlay.appendChild(origEl);
@@ -417,6 +423,26 @@
     observePlayerControls(player);  // lift the overlay off the control bar
     styleOverlay();
     return overlay;
+  }
+
+  // The overlay normally lets pointer input pass through to the player. The
+  // original cue text is the exception: users may select it, and a double-click
+  // on the active cue selects the complete cue instead of just one word.
+  function stopCuePointerPropagation(e) {
+    if (e.target.closest(".ytds-cue")) e.stopPropagation();
+  }
+
+  function selectCurrentCue(e) {
+    const current = e.target.closest(".ytds-cue-current");
+    if (!current || !origEl || !origEl.contains(current)) return;
+    const selection = window.getSelection();
+    if (!selection) return;
+    const range = document.createRange();
+    range.selectNodeContents(current);
+    selection.removeAllRanges();
+    selection.addRange(range);
+    e.preventDefault();
+    e.stopPropagation();
   }
 
   // A small round grip in the overlay's top-left corner. It is the only
@@ -785,15 +811,51 @@
     scheduleLift();                // text height changed — re-check the bar gap
   }
 
+  // Cue mode keeps one line of context above the active cue. The same helper is
+  // used for original and translation so the two languages stay structurally
+  // aligned. Fallback/scrape mode still writes a plain text node.
+  function paintCuePair(el, previousText, currentText) {
+    const frag = document.createDocumentFragment();
+    if (previousText) {
+      const previous = document.createElement("span");
+      previous.className = "ytds-cue ytds-cue-previous";
+      previous.textContent = previousText;
+      frag.appendChild(previous);
+    }
+    if (currentText) {
+      const current = document.createElement("span");
+      current.className = "ytds-cue ytds-cue-current";
+      current.textContent = currentText;
+      frag.appendChild(current);
+    }
+    el.replaceChildren(frag);
+  }
+
   function setOriginal(text) {
     if (!ensureOverlay()) return;
-    origEl.textContent = text || "";
+    if (cuePairActive) {
+      const previous = previousCueIdx >= 0 && cueList
+        ? cueList[previousCueIdx].text : "";
+      paintCuePair(origEl, previous, text || "");
+    } else {
+      origEl.textContent = text || "";
+    }
     updateEmptyState();
   }
 
   function setTranslation(text, forSource) {
     if (!ensureOverlay()) return;
-    transEl.textContent = text || "";
+    if (cuePairActive) {
+      const current = text || "";
+      let previous = cachedTranslationForCue(previousCueIdx);
+      // Smart-sentence mode can intentionally reuse one whole-sentence
+      // translation across several cues. Do not render that identical sentence
+      // twice when the original cues themselves are different.
+      if (previous && current && previous.trim() === current.trim()) previous = "";
+      paintCuePair(transEl, previous, current);
+    } else {
+      transEl.textContent = text || "";
+    }
     if (arguments.length > 1) lastTransSource = forSource || "";
     updateEmptyState();
   }
@@ -955,6 +1017,8 @@
   function startCueLoop() {
     stopCueLoop();
     activeCueIdx = -1;
+    cuePairActive = false;
+    previousCueIdx = -1;
     activeGroupIdx = -1;
     clearPendingTimer();
     cueEpoch++;                       // invalidate any in-flight gtx callbacks
@@ -970,6 +1034,8 @@
   function stopCueLoop() {
     if (cueTimer) { clearInterval(cueTimer); cueTimer = null; }
     activeCueIdx = -1;
+    cuePairActive = false;
+    previousCueIdx = -1;
   }
 
   function cueTick() {
@@ -983,6 +1049,8 @@
     if (idx < 0) {
       if (activeCueIdx !== -1) {
         activeCueIdx = -1;
+        cuePairActive = false;
+        previousCueIdx = -1;
         activeGroupIdx = -1;              // no cue ⟹ no group (explicit invariant)
         setOriginal("");
         setTranslation("", "");
@@ -992,11 +1060,17 @@
 
     if (idx === activeCueIdx) return;     // same sentence — no re-render, no jitter
     activeCueIdx = idx;
+    cuePairActive = true;
+    previousCueIdx = idx - 1;
     // set BEFORE rendering: group gtx callbacks paint iff activeGroupIdx matches
     activeGroupIdx = (cueToGroup && cueToGroup[idx] != null) ? cueToGroup[idx] : -1;
 
     const cue = cueList[idx];
     setOriginal(cue.text);
+    // Clear only the CURRENT translation while it is fetched. The preceding
+    // cue remains visible in its own, dimmed row instead of masquerading as the
+    // translation of the newly active cue.
+    setTranslation("", cue.text);
     renderTranslationForCue(idx, cue);
     prefetchFrom(idx);                    // warm upcoming translations (gtx mode)
   }
@@ -1016,6 +1090,36 @@
       return sameLangLine(origText);
     }
     return trans;
+  }
+
+  // Return a translation that is already available without starting network
+  // work. Used for the previous cue: aligned tracks resolve immediately, while
+  // smart-sentence/per-cue engines use their warmed cache when present.
+  function cachedTranslationForCue(idx) {
+    if (!cueList || idx == null || idx < 0 || idx >= cueList.length) return "";
+    const cue = cueList[idx];
+    const origText = cue.text;
+
+    if (cueSameLang) return sameLangLine(origText);
+    if (cueAligned && typeof cue.trans === "string" && cue.trans) {
+      return dedupeTrans(cue.trans, origText);
+    }
+    if (tcueList && cueAligned === false) {
+      const matched = nearestTcue(cue.start);
+      if (matched) return dedupeTrans(matched.text, origText);
+    }
+
+    const perCue = transCache.get(cueVideoId + " " + idx);
+    if (perCue !== undefined) return dedupeTrans(perCue, origText);
+
+    const groupIdx = cueToGroup && cueToGroup[idx] != null ? cueToGroup[idx] : -1;
+    if (groupIdx >= 0) {
+      const grouped = transCache.get(groupKey(groupIdx));
+      if (grouped !== undefined) {
+        return grouped === "" ? sameLangLine(origText) : grouped;
+      }
+    }
+    return "";
   }
 
   function renderTranslationForCue(idx, cue) {
@@ -1466,6 +1570,8 @@
 
   function startFallback() {
     if (pollTimer) return;
+    cuePairActive = false;
+    previousCueIdx = -1;
     ensureOverlay();
     pollTimer = setInterval(fallbackTick, 200);
   }

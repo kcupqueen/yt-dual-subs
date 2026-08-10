@@ -88,6 +88,35 @@ html.ytds-active .caption-window {
 
 .ytds-line:empty { display: none; }
 
+/* Cue mode shows one line of context plus the active cue. The current cue is
+   deliberately marked inside each language block; the previous cue remains
+   readable but visually recedes. */
+.ytds-cue {
+  display: block;
+  padding: 1px 7px;
+  border-radius: 3px;
+}
+
+.ytds-cue-previous {
+  opacity: 0.55;
+  font-weight: 500;
+}
+
+.ytds-cue-current {
+  background: rgba(255, 255, 255, 0.16);
+  box-shadow: inset 3px 0 currentColor;
+}
+
+/* Only original cue text participates in selection. Pointer events remain
+   disabled everywhere else, including the translated line, so normal player
+   clicks keep passing through the overlay. */
+.ytds-orig .ytds-cue {
+  pointer-events: auto;
+  user-select: text;
+  -webkit-user-select: text;
+  cursor: text;
+}
+
 /* ---- draggable handle -------------------------------------------------- */
 /* The overlay itself stays pointer-events:none so the player keeps receiving
    clicks; only this small grip is interactive. It sits at the overlay's
