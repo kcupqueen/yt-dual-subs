@@ -494,13 +494,18 @@
 
   function setAIHoverText(text) {
     if (!ensureOverlay() || !aiHoverEl) return;
+    const opening = aiHoverEl.hidden;
     aiHoverEl.hidden = false;
     aiHoverEl.value = String(text || "");
 
     const player = getPlayer();
     const playerHeight = player ? player.clientHeight : 480;
-    const playerWidth = player ? player.clientWidth : 640;
-    aiHoverEl.style.width = Math.max(240, Math.min(560, playerWidth * 0.82)) + "px";
+    // Fix the width for the lifetime of this hover. Stream deltas may change
+    // its height, but never its width, so the box does not visually breathe.
+    if (opening) {
+      const playerWidth = player ? player.clientWidth : 640;
+      aiHoverEl.style.width = Math.round(playerWidth * 0.6) + "px";
+    }
     aiHoverEl.style.height = "auto";
     const wantedHeight = Math.max(58, aiHoverEl.scrollHeight + 2);
     const height = Math.min(wantedHeight, Math.max(90, playerHeight * 0.36));
@@ -528,6 +533,7 @@
     if (aiHoverEl) {
       aiHoverEl.hidden = true;
       aiHoverEl.value = "";
+      aiHoverEl.style.width = "";
       aiHoverEl.style.height = "";
       aiHoverEl.classList.remove("ytds-ai-hover-below");
     }
