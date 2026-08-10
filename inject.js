@@ -181,9 +181,18 @@
       if (!ev || !Array.isArray(ev.segs)) continue;
       let text = "";
       let off = 0;
+      const wordOffsets = [];
       for (const s of ev.segs) {
         if (s && typeof s.utf8 === "string") {
           text += s.utf8;
+          // Preserve word-level timing for the English display-only sentence
+          // reconstruction in content.js. ASR json3 normally emits one word
+          // per segment; manual captions often do not, so their words are
+          // estimated across the cue duration downstream instead.
+          const words = s.utf8.match(/\S+/g) || [];
+          for (let i = 0; i < words.length; i++) {
+            wordOffsets.push(typeof s.tOffsetMs === "number" ? s.tOffsetMs : null);
+          }
           // Track the last NON-BLANK word's offset. ASR tracks carry per-word
           // tOffsetMs; blank segs ("\n") may carry one too and would inflate it.
           if (s.utf8.trim() && typeof s.tOffsetMs === "number") off = s.tOffsetMs;
@@ -204,7 +213,12 @@
       // per-word segs, so lastOff === start — sentence grouping in content.js
       // reads the pause as (next.start - lastOff), which for manual tracks is
       // roughly the cue duration and therefore almost always a sentence break.
-      cues.push({ start, dur, text, lastOff: start + off });
+      const cleanWordCount = (text.match(/\S+/g) || []).length;
+      const cue = { start, dur, text, lastOff: start + off };
+      // Speaker-marker cleanup can change the token count. In that uncommon
+      // case discard the offsets rather than attach a time to the wrong word.
+      if (wordOffsets.length === cleanWordCount) cue.wordOffsets = wordOffsets;
+      cues.push(cue);
     }
     return cues;
   }
@@ -360,6 +374,7 @@
 
       post("cues", {
         cues, tcues, aligned, trackKind: kind, sameLang,
+        trackLang: trackLangOf(src),
         // stable track identity (normKey strips pot/fmt/tlang): lets content.js
         // drop cached translations when the TRACK changes on the same video
         // (CC language switch / auto-dub mismatch fix) — same cache keys,

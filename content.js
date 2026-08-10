@@ -161,11 +161,13 @@
 
   // cue mode
   let cueList = null;        // [{start,dur,end,text,trans?}]
+  let displayCueList = null; // English natural sentences; raw cueList stays authoritative
   let tcueList = null;       // aligned translation cues OR null (timestamp fallback)
   let cueAligned = null;     // boolean | null
   let cueVideoId = "";       // videoId the cues belong to
   let cueTimer = null;       // currentTime-driven loop
   let activeCueIdx = -1;     // index of currently shown cue
+  let activeDisplayCueIdx = -1; // natural-sentence index shown on the original line
   let cuePairActive = false; // cue mode renders the previous + current cue
   let previousCueIdx = -1;   // previous cue shown above the highlighted current cue
   let cueEpoch = 0;          // bumped each (re)start/teardown; invalidates in-flight gtx
@@ -183,6 +185,7 @@
   let cueToGroup = null;        // cue idx -> group idx | null (null = per-cue mode)
   let activeGroupIdx = -1;      // group of the active cue (-1 when none/per-cue)
   let cueTrackKind = "";        // "asr" | "manual" | "" — from inject's captured URL
+  let cueTrackLang = "";        // source track language, e.g. "en" / "en-US"
   let cueSameLang = false;      // track already speaks the target language —
                                 // nothing to translate, render single-line
   let cueTrackId = "";          // normKey of the track the caches were filled
@@ -834,8 +837,9 @@
   function setOriginal(text) {
     if (!ensureOverlay()) return;
     if (cuePairActive) {
-      const previous = previousCueIdx >= 0 && cueList
-        ? cueList[previousCueIdx].text : "";
+      const previous = displayCueList
+        ? (activeDisplayCueIdx > 0 ? displayCueList[activeDisplayCueIdx - 1].text : "")
+        : (previousCueIdx >= 0 && cueList ? cueList[previousCueIdx].text : "");
       paintCuePair(origEl, previous, text || "");
     } else {
       origEl.textContent = text || "";
@@ -1014,9 +1018,21 @@
     return -1;                        // genuine gap
   }
 
+  function activeDisplayCueIdxAt(t) {
+    if (!displayCueList || !displayCueList.length) return -1;
+    let lo = 0, hi = displayCueList.length - 1, ans = -1;
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1;
+      if (displayCueList[mid].start <= t) { ans = mid; lo = mid + 1; }
+      else hi = mid - 1;
+    }
+    return ans >= 0 && t < displayCueList[ans].end ? ans : -1;
+  }
+
   function startCueLoop() {
     stopCueLoop();
     activeCueIdx = -1;
+    activeDisplayCueIdx = -1;
     cuePairActive = false;
     previousCueIdx = -1;
     activeGroupIdx = -1;
@@ -1034,6 +1050,7 @@
   function stopCueLoop() {
     if (cueTimer) { clearInterval(cueTimer); cueTimer = null; }
     activeCueIdx = -1;
+    activeDisplayCueIdx = -1;
     cuePairActive = false;
     previousCueIdx = -1;
   }
@@ -1045,10 +1062,12 @@
     const t = video.currentTime * 1000;
 
     const idx = activeCueIdxAt(t);
+    const displayIdx = displayCueList ? activeDisplayCueIdxAt(t) : idx;
 
     if (idx < 0) {
       if (activeCueIdx !== -1) {
         activeCueIdx = -1;
+        activeDisplayCueIdx = -1;
         cuePairActive = false;
         previousCueIdx = -1;
         activeGroupIdx = -1;              // no cue ⟹ no group (explicit invariant)
@@ -1058,21 +1077,33 @@
       return;
     }
 
-    if (idx === activeCueIdx) return;     // same sentence — no re-render, no jitter
-    activeCueIdx = idx;
+    const sourceChanged = idx !== activeCueIdx;
+    const displayChanged = displayIdx !== activeDisplayCueIdx;
+    if (!sourceChanged && !displayChanged) return;
+
+    if (sourceChanged) activeCueIdx = idx;
     cuePairActive = true;
-    previousCueIdx = idx - 1;
-    // set BEFORE rendering: group gtx callbacks paint iff activeGroupIdx matches
-    activeGroupIdx = (cueToGroup && cueToGroup[idx] != null) ? cueToGroup[idx] : -1;
+    if (sourceChanged) previousCueIdx = idx - 1;
+    if (sourceChanged) {
+      // set BEFORE rendering: group gtx callbacks paint iff activeGroupIdx matches
+      activeGroupIdx = (cueToGroup && cueToGroup[idx] != null) ? cueToGroup[idx] : -1;
+    }
 
     const cue = cueList[idx];
-    setOriginal(cue.text);
-    // Clear only the CURRENT translation while it is fetched. The preceding
-    // cue remains visible in its own, dimmed row instead of masquerading as the
-    // translation of the newly active cue.
-    setTranslation("", cue.text);
-    renderTranslationForCue(idx, cue);
-    prefetchFrom(idx);                    // warm upcoming translations (gtx mode)
+    if (displayChanged || (sourceChanged && displayIdx < 0)) {
+      activeDisplayCueIdx = displayIdx;
+      const displayText = displayCueList && displayIdx >= 0
+        ? displayCueList[displayIdx].text : cue.text;
+      setOriginal(displayText);
+    }
+    if (sourceChanged) {
+      // Clear only the CURRENT translation while it is fetched. The preceding
+      // cue remains visible in its own, dimmed row instead of masquerading as the
+      // translation of the newly active cue.
+      setTranslation("", cue.text);
+      renderTranslationForCue(idx, cue);
+      prefetchFrom(idx);                  // warm upcoming translations (gtx mode)
+    }
   }
 
   // What the translation line shows when there is nothing to translate:
@@ -1278,6 +1309,122 @@
       }
       c.end = end;
     }
+  }
+
+  // ---- English display sentences -----------------------------------------
+  // YouTube's transport cues are timing packets, not grammatical sentences:
+  // one can end with the first words of the next sentence, while that sentence
+  // continues in the following cue. Keep cueList untouched for translation and
+  // export, and derive this display-only timeline for English original text.
+  const EN_ABBREVIATIONS = new Set([
+    "mr.", "mrs.", "ms.", "dr.", "prof.", "sr.", "jr.", "st.",
+    "vs.", "etc.", "e.g.", "i.e.", "fig.", "no.", "inc.", "ltd.",
+    "jan.", "feb.", "mar.", "apr.", "jun.", "jul.", "aug.",
+    "sep.", "sept.", "oct.", "nov.", "dec."
+  ]);
+  const DISPLAY_SENTENCE_MAX_WORDS = 48;
+
+  function isEnglishTrack(lang) {
+    return String(lang || "").toLowerCase().split("-")[0] === "en";
+  }
+
+  function endsEnglishSentence(word) {
+    const w = String(word || "");
+    const bare = w.replace(/["'”’\)\]\}]+$/g, "");
+    if (!/[.!?]$/.test(bare)) return false;
+    if (/[!?]$/.test(bare)) return true;
+    const lower = bare.toLowerCase();
+    if (EN_ABBREVIATIONS.has(lower)) return false;
+    if (/^\d+\.\d+$/.test(bare)) return false;          // 3.14
+    if (/^(?:[a-z]\.){2,}$/i.test(bare)) return false;  // U.S. / e.g.
+    if (/^[a-z]\.$/i.test(bare)) return false;          // middle initial
+    return true;
+  }
+
+  function joinEnglishWords(tokens) {
+    return tokens.map((t2) => t2.text).join(" ")
+      .replace(/\s+([,.;:!?%\)\]\}])/g, "$1")
+      .replace(/([\(\[\{“])\s+/g, "$1")
+      .trim();
+  }
+
+  function buildEnglishDisplayCues(list) {
+    if (!Array.isArray(list) || !list.length) return null;
+    const tokens = [];
+    let lastTokenStart = -Infinity;
+
+    for (let cueIdx = 0; cueIdx < list.length; cueIdx++) {
+      const cue = list[cueIdx];
+      const words = String(cue.text || "").match(/\S+/g) || [];
+      if (!words.length) continue;
+      const offsets = Array.isArray(cue.wordOffsets) && cue.wordOffsets.length === words.length
+        ? cue.wordOffsets : null;
+      const numericOffsets = offsets ? offsets.filter((v) => typeof v === "number") : [];
+      const hasWordTiming = numericOffsets.length > 1 &&
+        Math.max(...numericOffsets) > Math.min(...numericOffsets);
+      const span = Math.max(1, (cue.end || (cue.start + cue.dur)) - cue.start);
+
+      for (let wordIdx = 0; wordIdx < words.length; wordIdx++) {
+        const estimated = cue.start + span * (wordIdx / words.length);
+        const timed = hasWordTiming && typeof offsets[wordIdx] === "number"
+          ? cue.start + offsets[wordIdx] : estimated;
+        // Binary search requires a monotonic timeline. A 1ms nudge only affects
+        // tied offsets (several words in one json3 segment), never audible timing.
+        const start = Math.max(timed, lastTokenStart + 1);
+        tokens.push({ text: words[wordIdx], start, sourceIdx: cueIdx });
+        lastTokenStart = start;
+      }
+    }
+    if (!tokens.length) return null;
+
+    for (let i = 0; i < tokens.length; i++) {
+      const source = list[tokens[i].sourceIdx];
+      const sourceEnd = source.end || (source.start + source.dur);
+      tokens[i].end = i + 1 < tokens.length
+        ? Math.max(tokens[i].start + 1, tokens[i + 1].start)
+        : Math.max(tokens[i].start + 1, sourceEnd);
+    }
+
+    const sentences = [];
+    let pending = [];
+    const flush = () => {
+      if (!pending.length) return;
+      const first = pending[0], last = pending[pending.length - 1];
+      const text = joinEnglishWords(pending);
+      if (text) {
+        sentences.push({
+          start: first.start,
+          end: Math.max(first.start + 1, last.end),
+          text,
+          startCueIdx: first.sourceIdx,
+          endCueIdx: last.sourceIdx
+        });
+      }
+      pending = [];
+    };
+
+    for (let i = 0; i < tokens.length; i++) {
+      const token = tokens[i];
+      pending.push(token);
+      const atSentenceEnd = endsEnglishSentence(token.text);
+      const next = tokens[i + 1];
+      const cappedAtCueEdge = pending.length >= DISPLAY_SENTENCE_MAX_WORDS &&
+        (!next || next.sourceIdx !== token.sourceIdx);
+      if (atSentenceEnd || cappedAtCueEdge) flush();
+    }
+    flush();
+
+    // Keep each completed sentence visible until the next one begins. This also
+    // prevents a punctuation token's tiny word duration from causing a flash.
+    for (let i = 0; i < sentences.length; i++) {
+      const next = sentences[i + 1];
+      if (next && next.start > sentences[i].start) sentences[i].end = next.start;
+      else if (!next) {
+        const tail = list[list.length - 1];
+        sentences[i].end = Math.max(sentences[i].end, tail.end, sentences[i].start + 1000);
+      }
+    }
+    return sentences.length ? sentences : null;
   }
 
   // ---- sentence groups (gtx smart-sentence mode) ---------------------------
@@ -1491,9 +1638,12 @@
     cueVideoId = data.videoId || currentVideoId;
     cueTrackKind = data.trackKind === "asr" ? "asr"
                  : data.trackKind ? "manual" : "";
+    cueTrackLang = data.trackLang || "";
     cueSameLang = !!data.sameLang;
 
     if (!cueList.length) { onNoCues(data); return; }
+    displayCueList = isEnglishTrack(cueTrackLang)
+      ? buildEnglishDisplayCues(cueList) : null;
     // A different TRACK on the same video (user switched the CC language, or
     // the auto-dub mismatch fix changed tracks) must not read the previous
     // track's cached translations: the group/cue cache keys collide while the
@@ -1599,11 +1749,13 @@
     nocuesFallback = true;
     stopCueLoop();
     cueList = null;
+    displayCueList = null;
     tcueList = null;
     sentGroups = null;
     cueToGroup = null;
     activeGroupIdx = -1;
     cueTrackKind = "";
+    cueTrackLang = "";
     cueSameLang = false;
     clearPendingTimer();
     if (settings.enabled) startFallback();
@@ -2152,14 +2304,17 @@
     stopFallback();
     removeOverlay();
     cueList = null;
+    displayCueList = null;
     tcueList = null;
     cueAligned = null;
     cueVideoId = "";
     activeCueIdx = -1;
+    activeDisplayCueIdx = -1;
     sentGroups = null;
     cueToGroup = null;
     activeGroupIdx = -1;
     cueTrackKind = "";
+    cueTrackLang = "";
     cueSameLang = false;
     clearPendingTimer();
     nocuesFallback = false;
