@@ -1,20 +1,21 @@
-/* options.css — settings page. Same dark palette as popup.css; the tokens are
+/* options.css — settings page. Same Notion-inspired palette as popup.css; the tokens are
    duplicated on purpose (popup.css pins body width to 360px, so it cannot be
    linked here). Keep the two token blocks in step. */
 :root {
-  --bg: #0f0f0f;
-  --surface: #181818;
-  --surface-2: #212121;
-  --line: #303030;
-  --txt: #f1f1f1;
-  --muted: #aaaaaa;
-  --accent: #3ea6ff;
-  --accent-dim: rgba(62, 166, 255, 0.16);
-  --radius: 10px;
+  --bg: #f7f7f5;
+  --surface: #ffffff;
+  --surface-2: #f1f1ef;
+  --line: rgba(55, 53, 47, 0.16);
+  --line-strong: rgba(55, 53, 47, 0.28);
+  --txt: #37352f;
+  --muted: #787774;
+  --accent: #2383e2;
+  --accent-dim: rgba(35, 131, 226, 0.11);
+  --primary: #37352f;
+  --shadow: 0 1px 2px rgba(15, 15, 15, 0.04), 0 4px 12px rgba(15, 15, 15, 0.035);
+  --radius: 8px;
   font-size: 14px;
-  /* Native widgets (checkbox, select popup, scrollbar) render dark instead of
-     stamping a white box onto the page. */
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 * { box-sizing: border-box; }
@@ -26,6 +27,7 @@ body {
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, "PingFang SC",
                "Microsoft YaHei", sans-serif;
   line-height: 1.5;
+  letter-spacing: -0.005em;
 }
 
 button, input, select { font-family: inherit; }
@@ -40,7 +42,7 @@ button:focus-visible, select:focus-visible, input:focus-visible, a:focus-visible
   max-width: 960px; margin: 0 auto; padding: 28px 24px 18px;
 }
 .ohd-mark { flex: none; line-height: 0; }
-.ohd h1 { margin: 0; font-size: 19px; font-weight: 600; letter-spacing: .2px; }
+.ohd h1 { margin: 0; font-size: 20px; font-weight: 650; letter-spacing: -.02em; }
 .ohd-sub { margin: 4px 0 0; color: var(--muted); font-size: 13px; max-width: 62ch; }
 
 /* -------------------------------- layout -------------------------------- */
@@ -62,7 +64,7 @@ button:focus-visible, select:focus-visible, input:focus-visible, a:focus-visible
 .oside { display: flex; flex-direction: column; gap: 18px; }
 .onav {
   display: flex; flex-direction: column; gap: 2px; padding: 5px;
-  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+  background: transparent; border: 0; border-radius: var(--radius);
 }
 .onav-item {
   padding: 9px 11px; border: 0; border-radius: 7px;
@@ -70,8 +72,8 @@ button:focus-visible, select:focus-visible, input:focus-visible, a:focus-visible
   font-size: 13.5px; cursor: pointer;
   transition: background .12s, color .12s;
 }
-.onav-item:hover { background: var(--surface-2); color: var(--txt); }
-.onav-item.on { background: var(--accent-dim); color: var(--accent); font-weight: 600; }
+.onav-item:hover { background: rgba(55, 53, 47, .06); color: var(--txt); }
+.onav-item.on { background: rgba(55, 53, 47, .09); color: var(--txt); font-weight: 600; }
 .plist-wrap[hidden] { display: none; }
 
 /* -------------------------------- start --------------------------------- */
@@ -88,6 +90,7 @@ button:focus-visible, select:focus-visible, input:focus-visible, a:focus-visible
   display: grid; grid-template-columns: 1fr 260px; gap: 26px; align-items: center;
   padding: 22px 24px; margin-bottom: 14px;
   background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+  box-shadow: var(--shadow);
 }
 .ostep:nth-child(even) { grid-template-columns: 260px 1fr; }
 .ostep:nth-child(even) .ostep-txt { order: 2; }
@@ -95,7 +98,7 @@ button:focus-visible, select:focus-visible, input:focus-visible, a:focus-visible
 .ostep-n {
   display: inline-flex; align-items: center; justify-content: center;
   width: 29px; height: 29px; border-radius: 50%;
-  background: var(--accent-dim); color: var(--accent);
+  background: var(--primary); color: #fff;
   font-size: 14.5px; font-weight: 700; margin-bottom: 11px;
 }
 .ostep h2 { margin: 0 0 7px; font-size: 18px; font-weight: 600; letter-spacing: -.01em; }
@@ -124,14 +127,15 @@ button:focus-visible, select:focus-visible, input:focus-visible, a:focus-visible
 .olang-col .ohint { margin: 0 0 12px; max-width: 42ch; }
 .olang-list {
   list-style: none; margin: 0; padding: 5px;
-  background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--radius);
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+  box-shadow: var(--shadow);
   max-height: 420px; overflow-y: auto;
 }
 .olang {
   display: flex; align-items: center; gap: 10px;
   padding: 7px 9px; border-radius: 7px;
 }
-.olang:hover { background: rgba(255, 255, 255, .04); }
+.olang:hover { background: var(--surface-2); }
 .olang-name { flex: 1; min-width: 0; font-size: 13.5px; }
 .olang-en { color: var(--muted); font-size: 12px; }
 /* The button is the only control in the row, so it says what it does to a
@@ -144,7 +148,7 @@ button:focus-visible, select:focus-visible, input:focus-visible, a:focus-visible
   font-size: 15px; line-height: 1;
   transition: color .12s, border-color .12s, background .12s;
 }
-.olang-btn:hover { color: var(--txt); border-color: var(--muted); background: var(--surface); }
+.olang-btn:hover { color: var(--txt); border-color: var(--line-strong); background: var(--surface-2); }
 .olang-btn.add:hover { color: var(--accent); border-color: var(--accent); }
 .olang-btn:disabled { opacity: .35; cursor: default; }
 .olang-empty { padding: 10px; color: var(--muted); font-size: 13px; }
@@ -162,7 +166,7 @@ button:focus-visible, select:focus-visible, input:focus-visible, a:focus-visible
 /* ---------------------------- provider list ----------------------------- */
 .plist {
   list-style: none; margin: 0; padding: 5px;
-  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+  background: transparent; border: 0; border-radius: var(--radius);
 }
 .pitem {
   display: flex; align-items: center; gap: 10px;
@@ -171,9 +175,9 @@ button:focus-visible, select:focus-visible, input:focus-visible, a:focus-visible
   font-size: 13px; cursor: pointer;
 }
 .pitem:hover { background: var(--surface-2); }
-.pitem.on { background: var(--accent-dim); color: var(--accent); font-weight: 600; }
+.pitem.on { background: rgba(55, 53, 47, .09); color: var(--txt); font-weight: 600; }
 .pitem-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.pitem-ok { flex: none; font-size: 11px; color: #5fd38a; }
+.pitem-ok { flex: none; font-size: 11px; color: #2f7d4f; }
 .pitem.on .pitem-ok { color: inherit; }
 /* Which provider the extension actually translates with. The highlight means
    "this is the panel you are looking at" and nothing more, so being in use
@@ -184,11 +188,11 @@ button:focus-visible, select:focus-visible, input:focus-visible, a:focus-visible
   font-weight: 600;
   padding: 2px 7px;
   border-radius: 999px;
-  background: rgba(95, 211, 138, 0.16);
-  color: #5fd38a;
+  background: #edf6f0;
+  color: #2f7d4f;
   white-space: nowrap;
 }
-.pitem.on .pitem-inuse { background: rgba(255, 255, 255, 0.18); color: inherit; }
+.pitem.on .pitem-inuse { background: rgba(55, 53, 47, .09); color: inherit; }
 
 /* provider icon box: real mark or tinted monogram */
 .pico {
@@ -208,6 +212,7 @@ button:focus-visible, select:focus-visible, input:focus-visible, a:focus-visible
 .odetail {
   background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
   padding: 18px; display: flex; flex-direction: column; gap: 16px;
+  box-shadow: var(--shadow);
 }
 /* An author `display` beats the UA's `[hidden] { display: none }`, so anything
    toggled by the hidden attribute has to say so itself — the section switch
@@ -217,7 +222,7 @@ button:focus-visible, select:focus-visible, input:focus-visible, a:focus-visible
 .odetail-head h2 { margin: 0; font-size: 16px; font-weight: 600; }
 .okind {
   font-size: 10px; font-weight: 700; letter-spacing: .6px; text-transform: uppercase;
-  padding: 2px 6px; border-radius: 5px; background: var(--accent-dim); color: var(--accent);
+  padding: 2px 6px; border-radius: 4px; background: var(--surface-2); color: var(--muted);
 }
 .okind[hidden] { display: none; }
 
@@ -230,8 +235,8 @@ button:focus-visible, select:focus-visible, input:focus-visible, a:focus-visible
 /* "no key yet" line — the one thing a first-time visitor must notice */
 .oneed {
   margin: -6px 0 0; padding: 8px 11px; font-size: 12.5px;
-  color: #ffd88a; background: rgba(255, 216, 138, .08);
-  border: 1px solid rgba(255, 216, 138, .28); border-radius: 8px;
+  color: #7c5c00; background: #fbf3db;
+  border: 1px solid #e8d59c; border-radius: 6px;
 }
 .oneed[hidden] { display: none; }
 
@@ -246,9 +251,11 @@ button:focus-visible, select:focus-visible, input:focus-visible, a:focus-visible
 input[type="text"], input[type="url"], input[type="password"], select {
   width: 100%; padding: 9px 11px; font-size: 13px;
   background: var(--surface-2); color: var(--txt);
-  border: 1px solid var(--line); border-radius: 8px;
+  border: 1px solid var(--line); border-radius: 6px;
 }
-input::placeholder { color: #6d6d6d; }
+input::placeholder { color: #a4a29e; }
+input:hover, select:hover { border-color: var(--line-strong); }
+input:focus, select:focus { border-color: var(--accent); outline: 0; box-shadow: 0 0 0 2px var(--accent-dim); }
 input[hidden] { display: none; }
 
 .orow { display: flex; gap: 9px; align-items: center; }
@@ -256,29 +263,28 @@ input[hidden] { display: none; }
 
 .obtn {
   padding: 9px 14px; font-size: 13px; font-weight: 600;
-  border: 0; border-radius: 8px; cursor: pointer;
+  border: 0; border-radius: 6px; cursor: pointer;
   transition: filter .12s, opacity .12s;
 }
-.obtn.primary { background: var(--accent); color: #06121f; align-self: flex-start; padding: 10px 18px; }
+.obtn.primary { background: var(--primary); color: #fff; align-self: flex-start; padding: 10px 18px; }
 .obtn.ghost {
   flex: none; background: var(--surface-2); color: var(--txt);
   border: 1px solid var(--line); font-weight: 500;
 }
-.obtn:hover { filter: brightness(1.1); }
+.obtn:hover { filter: brightness(.92); }
 .obtn:disabled { opacity: .6; cursor: default; }
 
 .ochk { display: inline-flex; align-items: center; gap: 5px; color: var(--muted); cursor: pointer; }
-/* Drawn by hand rather than left to the platform: an unchecked native checkbox
-   stamps a white square onto the dark card even with color-scheme: dark. */
+/* Drawn by hand so checkboxes stay consistent across Chromium versions. */
 .ochk input {
   appearance: none; -webkit-appearance: none; margin: 0;
   width: 14px; height: 14px; cursor: pointer;
   background: var(--surface-2); border: 1px solid var(--line); border-radius: 4px;
   display: inline-grid; place-items: center;
 }
-.ochk input:checked { background: var(--accent); border-color: var(--accent); }
+.ochk input:checked { background: var(--primary); border-color: var(--primary); }
 .ochk input:checked::after {
-  content: "✓"; font-size: 10px; font-weight: 700; line-height: 1; color: #06121f;
+  content: "✓"; font-size: 10px; font-weight: 700; line-height: 1; color: #fff;
 }
 .olink {
   background: none; border: 0; padding: 0; cursor: pointer;
@@ -291,9 +297,9 @@ input[hidden] { display: none; }
 .ohint[hidden] { display: none; }
 .omsg { margin: -6px 0 0; font-size: 12.5px; color: var(--muted); }
 .omsg[hidden] { display: none; }
-.omsg.ok { color: #5fd38a; }
-.omsg.err { color: #ff8a8a; }
-.omsg.warn { color: #ffd88a; }
+.omsg.ok { color: #2f7d4f; }
+.omsg.err { color: #b42318; }
+.omsg.warn { color: #9a6700; }
 
 .onote {
   margin: 0; padding: 10px 12px; font-size: 12.5px; color: var(--muted);
@@ -307,5 +313,5 @@ input[hidden] { display: none; }
   font-size: 12px; color: var(--muted);
 }
 .oft p { margin: 0; max-width: 78ch; }
-.odim { color: #7a7a7a; font-size: 11.5px; }
+.odim { color: #9b9a97; font-size: 11.5px; }
 .oft a { color: var(--accent); }
