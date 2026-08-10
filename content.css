@@ -210,32 +210,46 @@ html.ytds-active .caption-window {
 .ytds-handle.ytds-dragging { cursor: grabbing; }
 .ytds-handle svg { width: 21px; height: 15px; display: block; pointer-events: none; }
 
-/* Visual preview only: future AI action beside the drag grip. It follows the
-   grip's visibility but does not accept input until its behaviour is wired. */
+/* Primary AI action beside the drag grip. Slightly larger and brighter than the
+   movement control so the two affordances do not compete visually. */
 .ytds-handle-action {
   position: absolute;
-  top: -34px;
+  top: -40px;
   left: 50px;
-  width: 46px;
-  height: 26px;
+  width: 66px;
+  height: 32px;
   padding: 0;
-  border: 1px solid rgba(255, 255, 255, 0.38);
-  border-radius: 8px;
-  background: rgba(8, 8, 8, 0.78);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
-  color: #ffe98a;
+  border: 1px solid rgba(132, 194, 255, 0.82);
+  border-radius: 9px;
+  background: rgba(35, 131, 226, 0.92);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.52),
+              inset 0 1px 0 rgba(255, 255, 255, 0.20);
+  color: #fff;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 3px;
-  font: 700 10px/1 system-ui, -apple-system, "Segoe UI", sans-serif;
-  letter-spacing: .2px;
+  gap: 5px;
+  font: 700 11.5px/1 system-ui, -apple-system, "Segoe UI", sans-serif;
+  letter-spacing: .3px;
   opacity: 0;
-  pointer-events: none;
-  transition: opacity .15s ease, background .15s ease, border-color .15s ease;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: opacity .15s ease, background .15s ease,
+              border-color .15s ease, transform .1s ease;
   z-index: 1;
 }
-.ytds-handle-action svg { width: 13px; height: 13px; display: block; }
+.ytds-handle-action svg { width: 16px; height: 16px; display: block; pointer-events: none; }
+.ytds-handle-action span { pointer-events: none; }
+.ytds-handle-action:hover {
+  background: rgba(49, 145, 239, 0.98);
+  border-color: rgba(190, 222, 255, 0.96);
+}
+.ytds-handle-action:active { transform: translateY(1px); }
+.ytds-handle-action:focus-visible {
+  opacity: 1;
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
 
 /* While dragging, the box floats as one frosted pane: the user is moving a
    thing, not loose text. A translucent white wash was invisible over bright

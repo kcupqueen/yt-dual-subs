@@ -198,5 +198,7 @@
   "aiStreamNoKey": {"message":"Configure the DeepSeek Key in settings first"},
   "aiStreamFailed": {"message":"AI translation failed"},
   "aiStreamEmpty": {"message":"AI returned no translation"},
-  "aiStreamResult": {"message":"AI translation"}
+  "aiStreamResult": {"message":"AI translation"},
+  "aiButtonTitle": {"message":"Pause and translate current sentence"},
+  "aiButtonAria": {"message":"Translate current sentence with AI"}
 }

@@ -478,6 +478,19 @@
     startAITranslation(current.textContent.trim());
   }
 
+  function currentSentenceText() {
+    if (!origEl) return "";
+    const current = origEl.querySelector(".ytds-cue-current");
+    return String((current && current.textContent) || "").trim();
+  }
+
+  function onAIButtonClick(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    const sentence = currentSentenceText();
+    if (sentence) startAITranslation(sentence);
+  }
+
   function detachAIResumeListener() {
     if (aiResumeVideo && aiResumeHandler) {
       aiResumeVideo.removeEventListener("play", aiResumeHandler);
@@ -653,18 +666,22 @@
 
     overlay.appendChild(handleEl);
 
-    // Visual-only preview for the action that will sit beside the drag grip.
-    // It deliberately ignores pointer input until its behaviour is decided.
+    // Direct AI action beside the drag grip: pause and translate the sentence
+    // currently shown on the original line.
     const aiButton = document.createElement("button");
     aiButton.type = "button";
     aiButton.className = "ytds-handle-action";
-    aiButton.tabIndex = -1;
-    aiButton.setAttribute("aria-hidden", "true");
+    aiButton.title = t("aiButtonTitle", "Pause and translate current sentence");
+    aiButton.setAttribute("aria-label", t("aiButtonAria", "Translate current sentence with AI"));
     aiButton.innerHTML =
       '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true">' +
       '<path d="M8 1.5l1.25 3.25L12.5 6 9.25 7.25 8 10.5 6.75 7.25 3.5 6l3.25-1.25L8 1.5Z" fill="currentColor"/>' +
       '<path d="M12.5 10l.65 1.35 1.35.65-1.35.65L12.5 14l-.65-1.35L10.5 12l1.35-.65L12.5 10Z" fill="currentColor"/>' +
       '</svg><span>AI</span>';
+    aiButton.addEventListener("pointerdown", (event) => event.stopPropagation());
+    aiButton.addEventListener("pointerup", (event) => event.stopPropagation());
+    aiButton.addEventListener("dblclick", (event) => event.stopPropagation());
+    aiButton.addEventListener("click", onAIButtonClick);
     overlay.appendChild(aiButton);
   }
 

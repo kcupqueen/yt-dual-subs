@@ -198,5 +198,7 @@
   "aiStreamNoKey": {"message":"請先在設定中配置 DeepSeek Key"},
   "aiStreamFailed": {"message":"AI 翻譯失敗"},
   "aiStreamEmpty": {"message":"AI 沒有返回譯文"},
-  "aiStreamResult": {"message":"AI 譯文"}
+  "aiStreamResult": {"message":"AI 譯文"},
+  "aiButtonTitle": {"message":"暫停並翻譯目前句子"},
+  "aiButtonAria": {"message":"使用 AI 翻譯目前句子"}
 }
