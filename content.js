@@ -141,7 +141,7 @@
   // own height); keep in step with .ytds-handle in content.css.
   const HANDLE_ROOM_PX = 60;
   // Product mode: show one original sentence as the double-click target, then
-  // replace the whole subtitle box with only the user-requested AI translation.
+  // show the contextual word explanation in a separate AI hover.
   // The legacy automatic original+translation pipeline remains in this file
   // for now, but no request or paint from it is entered while this is true.
   const API_ONLY_MODE = true;
@@ -440,7 +440,7 @@
     aiHoverEl.readOnly = true;
     aiHoverEl.rows = 2;
     aiHoverEl.hidden = true;
-    aiHoverEl.setAttribute("aria-label", t("aiStreamResult", "AI translation"));
+    aiHoverEl.setAttribute("aria-label", t("aiStreamResult", "Contextual word meaning"));
     aiHoverEl.setAttribute("aria-live", "polite");
     for (const eventName of ["pointerdown", "pointerup", "click", "dblclick"]) {
       aiHoverEl.addEventListener(eventName, (event) => event.stopPropagation());
@@ -458,8 +458,9 @@
   }
 
   // The overlay normally lets pointer input pass through to the player. The
-  // original cue text is the exception: users may select it, and a double-click
-  // on the active cue selects the complete cue instead of just one word.
+  // original cue text is the exception: users may select it. A double-click
+  // keeps the browser's normal one-word selection and looks that word up using
+  // the complete current sentence as context.
   function stopCuePointerPropagation(e) {
     if (e.target.closest(".ytds-cue")) e.stopPropagation();
   }
@@ -467,15 +468,25 @@
   function selectCurrentCue(e) {
     const current = e.target.closest(".ytds-cue-current");
     if (!current || !origEl || !origEl.contains(current)) return;
-    const selection = window.getSelection();
-    if (!selection) return;
-    const range = document.createRange();
-    range.selectNodeContents(current);
-    selection.removeAllRanges();
-    selection.addRange(range);
-    e.preventDefault();
     e.stopPropagation();
-    startAITranslation(current.textContent.trim());
+    // Do not preventDefault: the browser performs the one-word selection. Read
+    // it in the next task, after that default action has completed.
+    setTimeout(() => {
+      if (!current.isConnected) return;
+      const word = selectedTextWithin(current);
+      const context = String(current.textContent || "").trim();
+      if (word && context) startAIWordLookup(word, context);
+    }, 0);
+  }
+
+  function selectedTextWithin(element) {
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount < 1 || selection.isCollapsed) return "";
+    const range = selection.getRangeAt(0);
+    const common = range.commonAncestorContainer;
+    const node = common.nodeType === Node.TEXT_NODE ? common.parentNode : common;
+    if (!node || !element.contains(node)) return "";
+    return selection.toString().replace(/\s+/g, " ").trim();
   }
 
   function currentSentenceText() {
@@ -487,8 +498,10 @@
   function onAIButtonClick(event) {
     event.preventDefault();
     event.stopPropagation();
-    const sentence = currentSentenceText();
-    if (sentence) startAITranslation(sentence);
+    const current = origEl && origEl.querySelector(".ytds-cue-current");
+    const word = current ? selectedTextWithin(current) : "";
+    const context = currentSentenceText();
+    if (word && context) startAIWordLookup(word, context);
   }
 
   function detachAIResumeListener() {
@@ -557,13 +570,14 @@
     if (code === "NO_DEEPSEEK_KEY") {
       return t("aiStreamNoKey", "Configure the DeepSeek Key in settings first");
     }
-    return t("aiStreamFailed", "AI translation failed");
+    return t("aiStreamFailed", "AI word lookup failed");
   }
 
-  function startAITranslation(sentence) {
-    const source = String(sentence || "").trim();
+  function startAIWordLookup(word, context) {
+    const selectedWord = String(word || "").trim();
+    const sentenceContext = String(context || "").trim();
     const video = getVideo();
-    if (!source || !video) return;
+    if (!selectedWord || !sentenceContext || !video) return;
 
     cancelAITranslation(false);
     video.pause();
@@ -616,7 +630,7 @@
         overlay.classList.remove("ytds-ai-streaming");
         if (!output) {
           overlay.classList.add("ytds-ai-error");
-          setAIHoverText(t("aiStreamEmpty", "AI returned no translation"));
+          setAIHoverText(t("aiStreamEmpty", "AI returned no explanation"));
         }
         finishPort();
       }
@@ -633,7 +647,12 @@
     video.addEventListener("play", aiResumeHandler, { once: true });
 
     try {
-      port.postMessage({ type: "start", text: source, targetLang: settings.targetLang });
+      port.postMessage({
+        type: "start",
+        word: selectedWord,
+        context: sentenceContext,
+        targetLang: settings.targetLang
+      });
     } catch (_error) {
       showError("AI_STREAM_DISCONNECTED", "Unable to start the translation stream");
     }
@@ -671,8 +690,8 @@
     const aiButton = document.createElement("button");
     aiButton.type = "button";
     aiButton.className = "ytds-handle-action";
-    aiButton.title = t("aiButtonTitle", "Pause and translate current sentence");
-    aiButton.setAttribute("aria-label", t("aiButtonAria", "Translate current sentence with AI"));
+    aiButton.title = t("aiButtonTitle", "Pause and explain selected word");
+    aiButton.setAttribute("aria-label", t("aiButtonAria", "Explain selected word with AI"));
     aiButton.innerHTML =
       '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true">' +
       '<path d="M8 1.5l1.25 3.25L12.5 6 9.25 7.25 8 10.5 6.75 7.25 3.5 6l3.25-1.25L8 1.5Z" fill="currentColor"/>' +

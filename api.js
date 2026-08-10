@@ -1,10 +1,10 @@
-// api.js — DeepSeek streaming translation client.
+// api.js — DeepSeek streaming contextual word-meaning client.
 //
 // The extension service worker loads this file and forwards its deltas to the
 // content script over a Port. Node callers can also consume it directly:
 //
-//   for await (const chunk of YTDS_AI_API.translateStream(sourceText)) {
-//     translatedText += chunk;
+//   for await (const chunk of YTDS_AI_API.translateStream(word, { context })) {
+//     explanation += chunk;
 //   }
 //
 // Configuration follows the existing options page contract:
@@ -96,18 +96,24 @@
     return { key, model, targetLang };
   }
 
-  function translationMessages(sourceText, targetLang) {
+  function meaningMessages(word, context, targetLang) {
     return [
       {
         role: "system",
         content:
-          "You are a professional translation engine. Translate the user's text into " +
-          targetLang +
-          ". Return only the translation. Preserve the original meaning, tone, names, " +
-          "numbers, punctuation, formatting, and line breaks. Do not explain, annotate, " +
-          "quote the input, or use Markdown fences."
+          "You are a contextual vocabulary assistant. Explain what the selected word or " +
+          "phrase means specifically in the provided context. Answer in " + targetLang +
+          ". Be concise and learner-friendly. Explain the contextual meaning and nuance, " +
+          "not the whole sentence. Do not translate or summarize the entire context. " +
+          "Return only the explanation, without Markdown headings or fences."
       },
-      { role: "user", content: sourceText }
+      {
+        role: "user",
+        content:
+          "Selected word or phrase: " + word + "\n" +
+          "Context: " + context + "\n\n" +
+          "What does this word or phrase mean in this context?"
+      }
     ];
   }
 
@@ -154,20 +160,23 @@
   }
 
   /**
-   * Stream a translation from DeepSeek.
+   * Stream a contextual word-meaning explanation from DeepSeek.
    *
-   * @param {string} sourceText Text to translate.
-   * @param {{apiKey?: string, targetLang?: string, model?: string, signal?: AbortSignal}} [options]
+   * @param {string} sourceText Selected word or phrase.
+   * @param {{context?: string, apiKey?: string, targetLang?: string, model?: string, signal?: AbortSignal}} [options]
    *        Explicit values override environment variables or stored settings.
-   * @yields {string} Each translated text delta returned by DeepSeek.
+   * @yields {string} Each explanation delta returned by DeepSeek.
    */
   async function* translateStream(sourceText, options) {
     if (typeof sourceText !== "string" || !sourceText.trim()) {
-      throw new TypeError("sourceText must be a non-empty string");
+      throw new TypeError("sourceText must contain a selected word or phrase");
     }
 
     const opts = options || {};
     const config = await readConfig(opts);
+    const word = sourceText.trim();
+    const context = String(opts.context || "").trim();
+    if (!context) throw new TypeError("options.context must be a non-empty string");
     let response;
 
     try {
@@ -179,7 +188,7 @@
         },
         body: JSON.stringify({
           model: config.model,
-          messages: translationMessages(sourceText, config.targetLang),
+          messages: meaningMessages(word, context, config.targetLang),
           temperature: 0.2,
           stream: true
         }),

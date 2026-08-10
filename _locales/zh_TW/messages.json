@@ -196,9 +196,9 @@
   "fontCjkSerif": {"message":"中文宋體"},
   "fontCjkRound": {"message":"中文圓體"},
   "aiStreamNoKey": {"message":"請先在設定中配置 DeepSeek Key"},
-  "aiStreamFailed": {"message":"AI 翻譯失敗"},
-  "aiStreamEmpty": {"message":"AI 沒有返回譯文"},
-  "aiStreamResult": {"message":"AI 譯文"},
-  "aiButtonTitle": {"message":"暫停並翻譯目前句子"},
-  "aiButtonAria": {"message":"使用 AI 翻譯目前句子"}
+  "aiStreamFailed": {"message":"AI 詞義查詢失敗"},
+  "aiStreamEmpty": {"message":"AI 沒有返回詞義解釋"},
+  "aiStreamResult": {"message":"語境詞義"},
+  "aiButtonTitle": {"message":"暫停並解釋所選單字"},
+  "aiButtonAria": {"message":"使用 AI 解釋所選單字"}
 }

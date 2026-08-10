@@ -1075,9 +1075,14 @@ chrome.runtime.onConnect.addListener((port) => {
 
   port.onMessage.addListener((message) => {
     if (!message || message.type !== "start") return;
-    const text = String(message.text || "").trim();
-    if (!text) {
-      post({ type: "error", code: "EMPTY_SOURCE", message: "No sentence to translate" });
+    const word = String(message.word || message.text || "").trim();
+    const context = String(message.context || "").trim();
+    if (!word) {
+      post({ type: "error", code: "EMPTY_WORD", message: "No selected word" });
+      return;
+    }
+    if (!context) {
+      post({ type: "error", code: "EMPTY_CONTEXT", message: "No sentence context" });
       return;
     }
 
@@ -1087,7 +1092,8 @@ chrome.runtime.onConnect.addListener((port) => {
     const thisRun = ++run;
 
     (async () => {
-      for await (const chunk of AI_API.translateStream(text, {
+      for await (const chunk of AI_API.translateStream(word, {
+        context,
         targetLang: message.targetLang || "zh-CN",
         signal: thisController.signal
       })) {
@@ -1101,7 +1107,7 @@ chrome.runtime.onConnect.addListener((port) => {
       post({
         type: "error",
         code: (error && error.code) || "AI_STREAM_FAILED",
-        message: (error && error.message) || "AI translation failed"
+        message: (error && error.message) || "AI word lookup failed"
       });
     }).finally(() => {
       if (thisRun === run) controller = null;

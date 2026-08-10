@@ -2,7 +2,8 @@
 
 const { translateStream } = require("./api.js");
 
-const sourceText = process.argv.slice(2).join(" ").trim() ||
+const word = String(process.argv[2] || "work").trim();
+const context = process.argv.slice(3).join(" ").trim() ||
   "Artificial intelligence is changing the way people work.";
 
 if (!process.env.DEEPSEEK_API_KEY) {
@@ -13,7 +14,7 @@ if (!process.env.DEEPSEEK_API_KEY) {
   process.once("SIGINT", () => controller.abort());
 
   (async () => {
-    for await (const chunk of translateStream(sourceText, { signal: controller.signal })) {
+    for await (const chunk of translateStream(word, { context, signal: controller.signal })) {
       process.stdout.write(chunk);
     }
     process.stdout.write("\n");
@@ -23,7 +24,7 @@ if (!process.env.DEEPSEEK_API_KEY) {
       process.exitCode = 130;
       return;
     }
-    console.error("\nTranslation failed:", error.code || error.name, error.message);
+    console.error("\nWord lookup failed:", error.code || error.name, error.message);
     process.exitCode = 1;
   });
 }
