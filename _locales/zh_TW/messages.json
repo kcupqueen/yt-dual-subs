@@ -194,5 +194,8 @@
   "langsAdded": {"message":"已加入「$NAME$」","placeholders":{"name":{"content":"$1"}}},
   "langsSwitched": {"message":"它正在使用中,目標語言已改為「$NAME$」","placeholders":{"name":{"content":"$1"}}},
   "fontCjkSerif": {"message":"中文宋體"},
-  "fontCjkRound": {"message":"中文圓體"}
+  "fontCjkRound": {"message":"中文圓體"},
+  "aiStreamNoKey": {"message":"請先在設定中配置 DeepSeek Key"},
+  "aiStreamFailed": {"message":"AI 翻譯失敗"},
+  "aiStreamEmpty": {"message":"AI 沒有返回譯文"}
 }

@@ -194,5 +194,8 @@
   "langsAdded": {"message":"Added $NAME$","placeholders":{"name":{"content":"$1"}}},
   "langsSwitched": {"message":"That one was in use, so the target is now $NAME$","placeholders":{"name":{"content":"$1"}}},
   "fontCjkSerif": {"message":"Chinese serif"},
-  "fontCjkRound": {"message":"Chinese rounded"}
+  "fontCjkRound": {"message":"Chinese rounded"},
+  "aiStreamNoKey": {"message":"Configure the DeepSeek Key in settings first"},
+  "aiStreamFailed": {"message":"AI translation failed"},
+  "aiStreamEmpty": {"message":"AI returned no translation"}
 }

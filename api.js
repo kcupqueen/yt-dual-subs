@@ -1,8 +1,7 @@
-// api.js — standalone DeepSeek streaming translation client.
+// api.js — DeepSeek streaming translation client.
 //
-// This file is deliberately not loaded by the extension yet. When a caller is
-// ready to use it, load the script and consume the translated text as an async
-// iterator:
+// The extension service worker loads this file and forwards its deltas to the
+// content script over a Port. Node callers can also consume it directly:
 //
 //   for await (const chunk of YTDS_AI_API.translateStream(sourceText)) {
 //     translatedText += chunk;

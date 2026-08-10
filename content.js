@@ -149,6 +149,15 @@
   let transEl = null;
   let handleEl = null;
 
+  // User-initiated DeepSeek stream. Its translation temporarily owns the
+  // translated line until playback resumes, the active cue changes, or the
+  // overlay is torn down. The Port's disconnect aborts the worker-side fetch.
+  let aiStreamPort = null;
+  let aiStreamRun = 0;
+  let aiTranslationOverride = false;
+  let aiResumeVideo = null;
+  let aiResumeHandler = null;
+
   // drag bookkeeping (listeners live on the handle, so they die with overlay)
   let dragging = false;
   let dragMoved = false;       // true once the pointer actually moved past threshold
@@ -312,6 +321,7 @@
         }
       }
     }
+    if (needRecue) cancelAITranslation(false);
     applyStateToDom();
     if (overlay) styleOverlay();   // position/fonts/colors/bg/stroke/sizes apply live
     if ("enabled" in changes) syncCaptions();   // master switch flipped from popup
@@ -446,6 +456,126 @@
     selection.addRange(range);
     e.preventDefault();
     e.stopPropagation();
+    startAITranslation(current.textContent.trim());
+  }
+
+  function detachAIResumeListener() {
+    if (aiResumeVideo && aiResumeHandler) {
+      aiResumeVideo.removeEventListener("play", aiResumeHandler);
+    }
+    aiResumeVideo = null;
+    aiResumeHandler = null;
+  }
+
+  function closeAIStreamPort() {
+    const port = aiStreamPort;
+    aiStreamPort = null;
+    if (!port) return;
+    try { port.disconnect(); } catch (_error) { /* already disconnected */ }
+  }
+
+  function cancelAITranslation(rerender) {
+    aiStreamRun++;
+    closeAIStreamPort();
+    detachAIResumeListener();
+    aiTranslationOverride = false;
+    if (overlay) {
+      overlay.classList.remove("ytds-ai-override", "ytds-ai-streaming", "ytds-ai-error");
+    }
+
+    // Playback resumes at the same timestamp, so force the cue loop to repaint
+    // the normal cached/engine translation instead of waiting for the next cue.
+    if (rerender && cueTimer && cueList) {
+      activeCueIdx = -1;
+      activeDisplayCueIdx = -1;
+      cueTick();
+    }
+  }
+
+  function aiErrorText(code) {
+    if (code === "NO_DEEPSEEK_KEY") {
+      return t("aiStreamNoKey", "Configure the DeepSeek Key in settings first");
+    }
+    return t("aiStreamFailed", "AI translation failed");
+  }
+
+  function startAITranslation(sentence) {
+    const source = String(sentence || "").trim();
+    const video = getVideo();
+    if (!source || !video) return;
+
+    cancelAITranslation(false);
+    video.pause();
+
+    aiTranslationOverride = true;
+    ensureOverlay();
+    overlay.classList.add("ytds-ai-override", "ytds-ai-streaming");
+    overlay.classList.remove("ytds-ai-error");
+    setTranslation("…", source, true);
+
+    const run = ++aiStreamRun;
+    let port = null;
+    const connected = extCall(() => {
+      port = chrome.runtime.connect({ name: "ytds-ai-translation" });
+    });
+    if (!connected || !port) return;
+    aiStreamPort = port;
+
+    let output = "";
+    let settled = false;
+
+    function finishPort() {
+      if (aiStreamPort === port) aiStreamPort = null;
+      try { port.disconnect(); } catch (_error) { /* already disconnected */ }
+    }
+
+    function showError(code, message) {
+      if (settled || run !== aiStreamRun) return;
+      settled = true;
+      overlay.classList.remove("ytds-ai-streaming");
+      overlay.classList.add("ytds-ai-error");
+      setTranslation(aiErrorText(code), source, true);
+      if (message) console.warn("[YTDS] DeepSeek stream:", message);
+      finishPort();
+    }
+
+    port.onMessage.addListener((message) => {
+      if (settled || run !== aiStreamRun || !message) return;
+      if (message.type === "delta") {
+        output += String(message.content || "");
+        if (output) setTranslation(output, source, true);
+        return;
+      }
+      if (message.type === "error") {
+        showError(message.code, message.message);
+        return;
+      }
+      if (message.type === "done") {
+        settled = true;
+        overlay.classList.remove("ytds-ai-streaming");
+        if (!output) {
+          overlay.classList.add("ytds-ai-error");
+          setTranslation(t("aiStreamEmpty", "AI returned no translation"), source, true);
+        }
+        finishPort();
+      }
+    });
+
+    port.onDisconnect.addListener(() => {
+      if (settled || run !== aiStreamRun) return;
+      aiStreamPort = null;
+      showError("AI_STREAM_DISCONNECTED", "The translation stream disconnected");
+    });
+
+    aiResumeVideo = video;
+    aiResumeHandler = () => cancelAITranslation(true);
+    video.addEventListener("play", aiResumeHandler, { once: true });
+
+    try {
+      port.postMessage({ type: "start", text: source, targetLang: settings.targetLang });
+    } catch (_error) {
+      showError("AI_STREAM_DISCONNECTED", "Unable to start the translation stream");
+    }
   }
 
   // A small round grip in the overlay's top-left corner. It is the only
@@ -800,7 +930,7 @@
   function updateEmptyState() {
     if (!overlay) return;
     const oEmpty = !settings.showOriginal || !origEl.textContent;
-    const tEmpty = !settings.showTranslation || !transEl.textContent;
+    const tEmpty = (!settings.showTranslation && !aiTranslationOverride) || !transEl.textContent;
     const empty = oEmpty && tEmpty;
     overlay.classList.toggle("ytds-empty", empty);
     // The moment there is something on screen is the moment the grip is worth
@@ -847,7 +977,10 @@
     updateEmptyState();
   }
 
-  function setTranslation(text, forSource) {
+  function setTranslation(text, forSource, fromAI) {
+    // Normal tlang/gtx callbacks may finish while the user-triggered DeepSeek
+    // stream is painting. They stay cached, but must not overwrite its deltas.
+    if (aiTranslationOverride && !fromAI) return;
     if (!ensureOverlay()) return;
     if (cuePairActive) {
       let current = text || "";
@@ -1035,6 +1168,7 @@
   }
 
   function startCueLoop() {
+    cancelAITranslation(false);
     stopCueLoop();
     activeCueIdx = -1;
     activeDisplayCueIdx = -1;
@@ -1086,6 +1220,10 @@
     const sourceChanged = idx !== activeCueIdx;
     const displayChanged = displayIdx !== activeDisplayCueIdx;
     if (!sourceChanged && !displayChanged) return;
+
+    // Seeking while paused can move to another sentence without a play event.
+    // The old AI result must not remain paired with the new original text.
+    if (aiTranslationOverride) cancelAITranslation(false);
 
     if (sourceChanged) activeCueIdx = idx;
     cuePairActive = true;
@@ -2336,6 +2474,7 @@
   // STATE / TEARDOWN / SPA NAV
   // =========================================================================
   function teardownAll() {
+    cancelAITranslation(false);
     stopCueLoop();
     stopFallback();
     removeOverlay();

@@ -15,9 +15,10 @@
 // ahead of prefetch. No internal retries for transport errors: a failed request
 // is simply re-issued by content.js when its cue is next active.
 
-importScripts("providers.js", "languages.js");
+importScripts("api.js", "providers.js", "languages.js");
 const PROVIDERS = self.YTDS_PROVIDERS;
 const LANGS = self.YTDS_LANGS;
+const AI_API = self.YTDS_AI_API;
 
 const CACHE = new Map();          // key: `${ns}|${tl}|${text}` -> translated string
 const CACHE_MAX = 2000;           // simple LRU-ish cap
@@ -1046,6 +1047,64 @@ chrome.runtime.onInstalled.addListener((details) => {
         } catch (_e) { /* fall through to the badge */ }
       }
       showUpdateBadge();
+    });
+  });
+});
+
+// A Port keeps the MV3 worker alive for the duration of one user-initiated
+// stream. Content scripts cannot reliably make privileged cross-origin fetches,
+// so DeepSeek runs here and only text deltas cross the extension boundary.
+chrome.runtime.onConnect.addListener((port) => {
+  if (!port || port.name !== "ytds-ai-translation") return;
+
+  let controller = null;
+  let run = 0;
+  let disconnected = false;
+
+  function post(message) {
+    if (disconnected) return false;
+    try { port.postMessage(message); return true; } catch (_error) { return false; }
+  }
+
+  port.onDisconnect.addListener(() => {
+    disconnected = true;
+    run++;
+    if (controller) controller.abort();
+    controller = null;
+  });
+
+  port.onMessage.addListener((message) => {
+    if (!message || message.type !== "start") return;
+    const text = String(message.text || "").trim();
+    if (!text) {
+      post({ type: "error", code: "EMPTY_SOURCE", message: "No sentence to translate" });
+      return;
+    }
+
+    if (controller) controller.abort();
+    controller = new AbortController();
+    const thisController = controller;
+    const thisRun = ++run;
+
+    (async () => {
+      for await (const chunk of AI_API.translateStream(text, {
+        targetLang: message.targetLang || "zh-CN",
+        signal: thisController.signal
+      })) {
+        if (disconnected || thisRun !== run) return;
+        if (!post({ type: "delta", content: chunk })) return;
+      }
+      if (!disconnected && thisRun === run) post({ type: "done" });
+    })().catch((error) => {
+      if (error && error.name === "AbortError") return;
+      if (disconnected || thisRun !== run) return;
+      post({
+        type: "error",
+        code: (error && error.code) || "AI_STREAM_FAILED",
+        message: (error && error.message) || "AI translation failed"
+      });
+    }).finally(() => {
+      if (thisRun === run) controller = null;
     });
   });
 });

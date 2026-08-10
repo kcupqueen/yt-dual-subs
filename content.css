@@ -117,6 +117,22 @@ html.ytds-active .caption-window {
   cursor: text;
 }
 
+/* A double-clicked sentence temporarily owns the translation line. Force that
+   line visible even when the ordinary translation layer is disabled, and give
+   the live stream a quiet focus ring without changing the user's colours. */
+#ytds-overlay.ytds-ai-override .ytds-trans {
+  display: inline-block !important;
+}
+
+#ytds-overlay.ytds-ai-streaming .ytds-trans {
+  box-shadow: 0 0 0 1px rgba(62, 166, 255, 0.72),
+              0 0 12px rgba(62, 166, 255, 0.22);
+}
+
+#ytds-overlay.ytds-ai-error .ytds-trans {
+  color: #ffb4ab !important;
+}
+
 /* ---- draggable handle -------------------------------------------------- */
 /* The overlay itself stays pointer-events:none so the player keeps receiving
    clicks; only this small grip is interactive. It sits at the overlay's
