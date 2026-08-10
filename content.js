@@ -140,8 +140,8 @@
   // Vertical space the grip occupies above the subtitle box (top offset + its
   // own height); keep in step with .ytds-handle in content.css.
   const HANDLE_ROOM_PX = 60;
-  // Product mode: show one original sentence as the double-click target, then
-  // show the contextual word explanation in a separate AI hover.
+  // Product mode: show one original sentence. Clicking one word explains it in
+  // context; the separate AI button translates the complete current sentence.
   // The legacy automatic original+translation pipeline remains in this file
   // for now, but no request or paint from it is entered while this is true.
   const API_ONLY_MODE = true;
@@ -567,10 +567,8 @@
   function onAIButtonClick(event) {
     event.preventDefault();
     event.stopPropagation();
-    const current = origEl && origEl.querySelector(".ytds-cue-current");
-    const word = current ? selectedTextWithin(current) : "";
-    const context = currentSentenceText();
-    if (word && context) startAIWordLookup(word, context);
+    const sentence = currentSentenceText();
+    if (sentence) startAISentenceTranslation(sentence);
   }
 
   function detachAIResumeListener() {
@@ -639,14 +637,23 @@
     if (code === "NO_DEEPSEEK_KEY") {
       return t("aiStreamNoKey", "Configure the DeepSeek Key in settings first");
     }
-    return t("aiStreamFailed", "AI word lookup failed");
+    return t("aiStreamFailed", "AI request failed");
   }
 
   function startAIWordLookup(word, context) {
-    const selectedWord = String(word || "").trim();
-    const sentenceContext = String(context || "").trim();
+    startAIRequest({ mode: "meaning", word, context });
+  }
+
+  function startAISentenceTranslation(sentence) {
+    startAIRequest({ mode: "translate", text: sentence });
+  }
+
+  function startAIRequest(request) {
+    const mode = request && request.mode === "translate" ? "translate" : "meaning";
+    const input = String(mode === "translate" ? request.text : request.word || "").trim();
+    const sentenceContext = String((request && request.context) || "").trim();
     const video = getVideo();
-    if (!selectedWord || !sentenceContext || !video) return;
+    if (!input || (mode === "meaning" && !sentenceContext) || !video) return;
 
     cancelAITranslation(false);
     video.pause();
@@ -699,7 +706,7 @@
         overlay.classList.remove("ytds-ai-streaming");
         if (!output) {
           overlay.classList.add("ytds-ai-error");
-          setAIHoverText(t("aiStreamEmpty", "AI returned no explanation"));
+          setAIHoverText(t("aiStreamEmpty", "AI returned no result"));
         }
         finishPort();
       }
@@ -716,12 +723,12 @@
     video.addEventListener("play", aiResumeHandler, { once: true });
 
     try {
-      port.postMessage({
+      port.postMessage(Object.assign({
         type: "start",
-        word: selectedWord,
-        context: sentenceContext,
         targetLang: settings.targetLang
-      });
+      }, mode === "translate"
+        ? { mode: "translate", text: input }
+        : { mode: "meaning", word: input, context: sentenceContext }));
     } catch (_error) {
       showError("AI_STREAM_DISCONNECTED", "Unable to start the translation stream");
     }
@@ -754,13 +761,13 @@
 
     overlay.appendChild(handleEl);
 
-    // Direct AI action beside the drag grip: explain the word/phrase currently
-    // selected on the original line, using that line as context.
+    // Direct AI action beside the drag grip: pause and translate the complete
+    // current sentence. Single-click word lookup is a separate path.
     const aiButton = document.createElement("button");
     aiButton.type = "button";
     aiButton.className = "ytds-handle-action";
-    aiButton.title = t("aiButtonTitle", "Pause and explain selected word");
-    aiButton.setAttribute("aria-label", t("aiButtonAria", "Explain selected word with AI"));
+    aiButton.title = t("aiButtonTitle", "Pause and translate current sentence");
+    aiButton.setAttribute("aria-label", t("aiButtonAria", "Translate current sentence with AI"));
     aiButton.innerHTML =
       '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true">' +
       '<path d="M8 1.5l1.25 3.25L12.5 6 9.25 7.25 8 10.5 6.75 7.25 3.5 6l3.25-1.25L8 1.5Z" fill="currentColor"/>' +
@@ -1140,8 +1147,8 @@
   function setOriginal(text) {
     if (!ensureOverlay()) return;
     if (API_ONLY_MODE) {
-      // One visible sentence, no previous-cue context. Besides simplifying the
-      // UI, this guarantees a double click selects exactly the API payload.
+      // One visible sentence, no previous-cue context. The original line stays
+      // unchanged while AI results stream into the separate hover.
       paintCuePair(origEl, "", text || "");
     } else if (cuePairActive) {
       const previous = displayCueList

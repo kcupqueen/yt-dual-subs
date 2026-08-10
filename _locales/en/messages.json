@@ -196,9 +196,9 @@
   "fontCjkSerif": {"message":"Chinese serif"},
   "fontCjkRound": {"message":"Chinese rounded"},
   "aiStreamNoKey": {"message":"Configure the DeepSeek Key in settings first"},
-  "aiStreamFailed": {"message":"AI word lookup failed"},
-  "aiStreamEmpty": {"message":"AI returned no explanation"},
-  "aiStreamResult": {"message":"Contextual word meaning"},
-  "aiButtonTitle": {"message":"Pause and explain selected word"},
-  "aiButtonAria": {"message":"Explain selected word with AI"}
+  "aiStreamFailed": {"message":"AI request failed"},
+  "aiStreamEmpty": {"message":"AI returned no result"},
+  "aiStreamResult": {"message":"AI result"},
+  "aiButtonTitle": {"message":"Pause and translate current sentence"},
+  "aiButtonAria": {"message":"Translate current sentence with AI"}
 }

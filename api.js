@@ -1,4 +1,4 @@
-// api.js — DeepSeek streaming contextual word-meaning client.
+// api.js — DeepSeek streaming translation and contextual word-meaning client.
 //
 // The extension service worker loads this file and forwards its deltas to the
 // content script over a Port. Node callers can also consume it directly:
@@ -117,6 +117,21 @@
     ];
   }
 
+  function translationMessages(sourceText, targetLang) {
+    return [
+      {
+        role: "system",
+        content:
+          "You are a professional translation engine. Translate the user's text into " +
+          targetLang +
+          ". Return only the translation. Preserve the original meaning, tone, names, " +
+          "numbers, punctuation, formatting, and line breaks. Do not explain, annotate, " +
+          "quote the input, or use Markdown fences."
+      },
+      { role: "user", content: sourceText }
+    ];
+  }
+
   async function responseError(response) {
     let detail = "";
     try {
@@ -160,23 +175,26 @@
   }
 
   /**
-   * Stream a contextual word-meaning explanation from DeepSeek.
+   * Stream either a translation or a contextual word-meaning explanation.
    *
-   * @param {string} sourceText Selected word or phrase.
-   * @param {{context?: string, apiKey?: string, targetLang?: string, model?: string, signal?: AbortSignal}} [options]
+   * @param {string} sourceText Source sentence, selected word, or phrase.
+   * @param {{mode?: "meaning"|"translate", context?: string, apiKey?: string, targetLang?: string, model?: string, signal?: AbortSignal}} [options]
    *        Explicit values override environment variables or stored settings.
-   * @yields {string} Each explanation delta returned by DeepSeek.
+   * @yields {string} Each text delta returned by DeepSeek.
    */
   async function* translateStream(sourceText, options) {
     if (typeof sourceText !== "string" || !sourceText.trim()) {
-      throw new TypeError("sourceText must contain a selected word or phrase");
+      throw new TypeError("sourceText must be a non-empty string");
     }
 
     const opts = options || {};
     const config = await readConfig(opts);
-    const word = sourceText.trim();
+    const input = sourceText.trim();
+    const mode = opts.mode === "translate" ? "translate" : "meaning";
     const context = String(opts.context || "").trim();
-    if (!context) throw new TypeError("options.context must be a non-empty string");
+    if (mode === "meaning" && !context) {
+      throw new TypeError("options.context must be a non-empty string in meaning mode");
+    }
     let response;
 
     try {
@@ -188,7 +206,9 @@
         },
         body: JSON.stringify({
           model: config.model,
-          messages: meaningMessages(word, context, config.targetLang),
+          messages: mode === "translate"
+            ? translationMessages(input, config.targetLang)
+            : meaningMessages(input, context, config.targetLang),
           temperature: 0.2,
           stream: true
         }),
