@@ -571,6 +571,20 @@
     if (sentence) startAISentenceTranslation(sentence);
   }
 
+  function onVideoPause(event) {
+    if (orphaned || !settings.enabled || !API_ONLY_MODE) return;
+    const video = getVideo();
+    if (!video || event.target !== video) return;
+
+    // Clicking a word or the AI button pauses playback as part of an AI
+    // request. That request already owns the hover, so the resulting pause
+    // event must not start a second stream over it.
+    if (aiTranslationOverride) return;
+
+    const sentence = currentSentenceText();
+    if (sentence) startAISentenceTranslation(sentence);
+  }
+
   function detachAIResumeListener() {
     if (aiResumeVideo && aiResumeHandler) {
       aiResumeVideo.removeEventListener("play", aiResumeHandler);
@@ -656,9 +670,10 @@
     if (!input || (mode === "meaning" && !sentenceContext) || !video) return;
 
     cancelAITranslation(false);
-    video.pause();
-
+    // Mark the request before pause(): its pause event is observed globally
+    // and must not recursively start the automatic sentence translation.
     aiTranslationOverride = true;
+    video.pause();
     ensureOverlay();
     overlay.classList.add("ytds-ai-streaming");
     overlay.classList.remove("ytds-ai-error");
@@ -2733,6 +2748,9 @@
   // single listener instances (added once; never accumulate)
   window.addEventListener("yt-navigate-finish", onNav, true);
   window.addEventListener("message", onInjectMessage, false);
+  // `pause` does not bubble, so listen in the capture phase. This also follows
+  // YouTube when it replaces the <video> element during SPA navigation.
+  document.addEventListener("pause", onVideoPause, true);
 
   // Belt-and-braces nav watcher (mirrors inject.js): shorts swipes change the
   // URL rapidly and the yt-navigate-finish timing there is less battle-tested
