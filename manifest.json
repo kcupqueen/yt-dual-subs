@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "default_locale": "en",
   "name": "__MSG_extName__",
-  "version": "3.6.0",
+  "version": "1.0.0",
   "description": "__MSG_extDesc__",
   "minimum_chrome_version": "102",
   "permissions": ["storage"],
@@ -49,7 +49,7 @@
   ],
   "action": {
     "default_popup": "popup.html",
-    "default_title": "Dual Subtitles for YouTube",
+    "default_title": "Subtitles for YouTube",
     "default_icon": {
       "16": "icons/icon16.png",
       "48": "icons/icon48.png",
