@@ -140,6 +140,11 @@
   // Vertical space the grip occupies above the subtitle box (top offset + its
   // own height); keep in step with .ytds-handle in content.css.
   const HANDLE_ROOM_PX = 60;
+  // Product mode: show one original sentence as the double-click target, then
+  // replace the whole subtitle box with only the user-requested AI translation.
+  // The legacy automatic original+translation pipeline remains in this file
+  // for now, but no request or paint from it is entered while this is true.
+  const API_ONLY_MODE = true;
 
   let settings = { ...DEFAULTS };
 
@@ -904,9 +909,10 @@
     transEl.style.background = rgba(settings.transBg, settings.transBgOpacity);
     transEl.style.textShadow = outlineShadow(settings.transStroke, settings.transStrokeOpacity);
 
-    // per-line visibility
-    origEl.style.display = settings.showOriginal ? "" : "none";
-    transEl.style.display = settings.showTranslation ? "" : "none";
+    // API-only mode always exposes one original sentence as the interaction
+    // target. The translation line becomes visible only during an AI override.
+    origEl.style.display = API_ONLY_MODE ? "" : (settings.showOriginal ? "" : "none");
+    transEl.style.display = API_ONLY_MODE ? "none" : (settings.showTranslation ? "" : "none");
 
     applyPosition();
     updateEmptyState();
@@ -929,8 +935,8 @@
   // no text — so a disabled-but-non-empty layer does not keep the box open.
   function updateEmptyState() {
     if (!overlay) return;
-    const oEmpty = !settings.showOriginal || !origEl.textContent;
-    const tEmpty = (!settings.showTranslation && !aiTranslationOverride) || !transEl.textContent;
+    const oEmpty = aiTranslationOverride || !origEl.textContent;
+    const tEmpty = !aiTranslationOverride || !transEl.textContent;
     const empty = oEmpty && tEmpty;
     overlay.classList.toggle("ytds-empty", empty);
     // The moment there is something on screen is the moment the grip is worth
@@ -966,7 +972,11 @@
 
   function setOriginal(text) {
     if (!ensureOverlay()) return;
-    if (cuePairActive) {
+    if (API_ONLY_MODE) {
+      // One visible sentence, no previous-cue context. Besides simplifying the
+      // UI, this guarantees a double click selects exactly the API payload.
+      paintCuePair(origEl, "", text || "");
+    } else if (cuePairActive) {
       const previous = displayCueList
         ? (activeDisplayCueIdx > 0 ? displayCueList[activeDisplayCueIdx - 1].text : "")
         : (previousCueIdx >= 0 && cueList ? cueList[previousCueIdx].text : "");
@@ -982,7 +992,12 @@
     // stream is painting. They stay cached, but must not overwrite its deltas.
     if (aiTranslationOverride && !fromAI) return;
     if (!ensureOverlay()) return;
-    if (cuePairActive) {
+    if (API_ONLY_MODE && !fromAI) return;
+    if (fromAI) {
+      // Never reuse the legacy previous/current pair for the AI stream. Each
+      // delta replaces this single text node with the accumulated translation.
+      transEl.textContent = text || "";
+    } else if (cuePairActive) {
       let current = text || "";
       let previous = cachedTranslationForCue(previousCueIdx);
       if (Array.isArray(displayCueList)) {
@@ -1228,7 +1243,7 @@
     if (sourceChanged) activeCueIdx = idx;
     cuePairActive = true;
     if (sourceChanged) previousCueIdx = idx - 1;
-    if (sourceChanged) {
+    if (sourceChanged && !API_ONLY_MODE) {
       // set BEFORE rendering: group gtx callbacks paint iff activeGroupIdx matches
       activeGroupIdx = (cueToGroup && cueToGroup[idx] != null) ? cueToGroup[idx] : -1;
     }
@@ -1241,7 +1256,7 @@
         : cue.text;
       setOriginal(displayText);
     }
-    if (sourceChanged) {
+    if (sourceChanged && !API_ONLY_MODE) {
       // Clear only the CURRENT translation while it is fetched. The preceding
       // cue remains visible in its own, dimmed row instead of masquerading as the
       // translation of the newly active cue.
@@ -1845,7 +1860,7 @@
     // auto on an ASR track, or a failed tlang fetch). aligned true/false means
     // the tlang paths render — groups stay dormant (null). A same-language
     // track never translates at all, so it never needs groups either.
-    if (cueAligned == null && !cueSameLang) buildSentenceGroups(cueList);
+    if (!API_ONLY_MODE && cueAligned == null && !cueSameLang) buildSentenceGroups(cueList);
     else { sentGroups = null; cueToGroup = null; }
     startCueLoop();
   }
@@ -1889,7 +1904,7 @@
     }
 
     setOriginal(text);
-    scheduleTranslate(text);
+    if (!API_ONLY_MODE) scheduleTranslate(text);
   }
 
   function startFallback() {
@@ -2447,6 +2462,7 @@
 
   // Fold our engine setting into the 3-value protocol inject.js speaks.
   function injectMode() {
+    if (API_ONLY_MODE) return "gtx";                 // original track only
     if (settings.engine === "byo") return "gtx";        // "give me the original"
     if (settings.engine === "auto" && gtxFellBack) return "tlang";
     return settings.engine;
