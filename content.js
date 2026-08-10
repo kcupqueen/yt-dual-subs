@@ -152,11 +152,12 @@
   let overlay = null;
   let origEl = null;
   let transEl = null;
+  let aiHoverEl = null;
   let handleEl = null;
 
-  // User-initiated DeepSeek stream. Its translation temporarily owns the
-  // translated line until playback resumes, the active cue changes, or the
-  // overlay is torn down. The Port's disconnect aborts the worker-side fetch.
+  // User-initiated DeepSeek stream. Its result lives in a separate hover
+  // textarea until playback resumes, the active cue changes, or the overlay is
+  // torn down. The Port's disconnect aborts the worker-side fetch.
   let aiStreamPort = null;
   let aiStreamRun = 0;
   let aiTranslationOverride = false;
@@ -433,8 +434,20 @@
     origEl.addEventListener("click", stopCuePointerPropagation);
     origEl.addEventListener("dblclick", selectCurrentCue);
 
+    aiHoverEl = document.createElement("textarea");
+    aiHoverEl.className = "ytds-ai-hover";
+    aiHoverEl.readOnly = true;
+    aiHoverEl.rows = 2;
+    aiHoverEl.hidden = true;
+    aiHoverEl.setAttribute("aria-label", t("aiStreamResult", "AI translation"));
+    aiHoverEl.setAttribute("aria-live", "polite");
+    for (const eventName of ["pointerdown", "pointerup", "click", "dblclick"]) {
+      aiHoverEl.addEventListener(eventName, (event) => event.stopPropagation());
+    }
+
     overlay.appendChild(transEl);
     overlay.appendChild(origEl);
+    overlay.appendChild(aiHoverEl);
     buildHandle();                  // drag grip (its listeners die with overlay)
     overlay.classList.toggle("ytds-shorts", isShorts());
     player.appendChild(overlay);
@@ -479,17 +492,48 @@
     try { port.disconnect(); } catch (_error) { /* already disconnected */ }
   }
 
+  function setAIHoverText(text) {
+    if (!ensureOverlay() || !aiHoverEl) return;
+    aiHoverEl.hidden = false;
+    aiHoverEl.value = String(text || "");
+
+    const player = getPlayer();
+    const playerHeight = player ? player.clientHeight : 480;
+    const playerWidth = player ? player.clientWidth : 640;
+    aiHoverEl.style.width = Math.max(240, Math.min(560, playerWidth * 0.82)) + "px";
+    aiHoverEl.style.height = "auto";
+    const wantedHeight = Math.max(58, aiHoverEl.scrollHeight + 2);
+    const height = Math.min(wantedHeight, Math.max(90, playerHeight * 0.36));
+    aiHoverEl.style.height = height + "px";
+    aiHoverEl.style.overflowY = wantedHeight > height ? "auto" : "hidden";
+
+    // The usual bottom subtitle position has ample room above it. For a custom
+    // or top preset position, flip the hover below the original when needed.
+    if (player && overlay) {
+      const playerRect = player.getBoundingClientRect();
+      const overlayRect = overlay.getBoundingClientRect();
+      const roomAbove = overlayRect.top - playerRect.top;
+      aiHoverEl.classList.toggle("ytds-ai-hover-below", roomAbove < height + 18);
+    }
+  }
+
   function cancelAITranslation(rerender) {
     aiStreamRun++;
     closeAIStreamPort();
     detachAIResumeListener();
     aiTranslationOverride = false;
     if (overlay) {
-      overlay.classList.remove("ytds-ai-override", "ytds-ai-streaming", "ytds-ai-error");
+      overlay.classList.remove("ytds-ai-streaming", "ytds-ai-error");
+    }
+    if (aiHoverEl) {
+      aiHoverEl.hidden = true;
+      aiHoverEl.value = "";
+      aiHoverEl.style.height = "";
+      aiHoverEl.classList.remove("ytds-ai-hover-below");
     }
 
-    // Playback resumes at the same timestamp, so force the cue loop to repaint
-    // the normal cached/engine translation instead of waiting for the next cue.
+    // Playback resumes at the same timestamp, so force the cue loop to refresh
+    // the current original sentence instead of waiting for the next cue.
     if (rerender && cueTimer && cueList) {
       activeCueIdx = -1;
       activeDisplayCueIdx = -1;
@@ -514,9 +558,9 @@
 
     aiTranslationOverride = true;
     ensureOverlay();
-    overlay.classList.add("ytds-ai-override", "ytds-ai-streaming");
+    overlay.classList.add("ytds-ai-streaming");
     overlay.classList.remove("ytds-ai-error");
-    setTranslation("…", source, true);
+    setAIHoverText("…");
 
     const run = ++aiStreamRun;
     let port = null;
@@ -539,7 +583,7 @@
       settled = true;
       overlay.classList.remove("ytds-ai-streaming");
       overlay.classList.add("ytds-ai-error");
-      setTranslation(aiErrorText(code), source, true);
+      setAIHoverText(aiErrorText(code));
       if (message) console.warn("[YTDS] DeepSeek stream:", message);
       finishPort();
     }
@@ -548,7 +592,7 @@
       if (settled || run !== aiStreamRun || !message) return;
       if (message.type === "delta") {
         output += String(message.content || "");
-        if (output) setTranslation(output, source, true);
+        if (output) setAIHoverText(output);
         return;
       }
       if (message.type === "error") {
@@ -560,7 +604,7 @@
         overlay.classList.remove("ytds-ai-streaming");
         if (!output) {
           overlay.classList.add("ytds-ai-error");
-          setTranslation(t("aiStreamEmpty", "AI returned no translation"), source, true);
+          setAIHoverText(t("aiStreamEmpty", "AI returned no translation"));
         }
         finishPort();
       }
@@ -927,6 +971,7 @@
     if (overlay) { overlay.remove(); overlay = null; } // removes handle + its listeners
     origEl = null;
     transEl = null;
+    aiHoverEl = null;
     handleEl = null;
   }
 
@@ -935,9 +980,12 @@
   // no text — so a disabled-but-non-empty layer does not keep the box open.
   function updateEmptyState() {
     if (!overlay) return;
-    const oEmpty = aiTranslationOverride || !origEl.textContent;
-    const tEmpty = !aiTranslationOverride || !transEl.textContent;
-    const empty = oEmpty && tEmpty;
+    const oEmpty = API_ONLY_MODE ? !origEl.textContent
+      : (!settings.showOriginal || !origEl.textContent);
+    const tEmpty = API_ONLY_MODE ? true
+      : (!settings.showTranslation || !transEl.textContent);
+    const aiEmpty = !aiTranslationOverride || !aiHoverEl || !aiHoverEl.value;
+    const empty = oEmpty && tEmpty && aiEmpty;
     overlay.classList.toggle("ytds-empty", empty);
     // The moment there is something on screen is the moment the grip is worth
     // pointing at — before that there is no box to drag.
@@ -987,17 +1035,12 @@
     updateEmptyState();
   }
 
-  function setTranslation(text, forSource, fromAI) {
-    // Normal tlang/gtx callbacks may finish while the user-triggered DeepSeek
-    // stream is painting. They stay cached, but must not overwrite its deltas.
-    if (aiTranslationOverride && !fromAI) return;
+  function setTranslation(text, forSource) {
+    // API-only mode never paints the legacy translation line; DeepSeek writes
+    // exclusively to aiHoverEl through setAIHoverText().
+    if (API_ONLY_MODE || aiTranslationOverride) return;
     if (!ensureOverlay()) return;
-    if (API_ONLY_MODE && !fromAI) return;
-    if (fromAI) {
-      // Never reuse the legacy previous/current pair for the AI stream. Each
-      // delta replaces this single text node with the accumulated translation.
-      transEl.textContent = text || "";
-    } else if (cuePairActive) {
+    if (cuePairActive) {
       let current = text || "";
       let previous = cachedTranslationForCue(previousCueIdx);
       if (Array.isArray(displayCueList)) {

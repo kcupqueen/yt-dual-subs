@@ -197,5 +197,6 @@
   "fontCjkRound": {"message":"Chinese rounded"},
   "aiStreamNoKey": {"message":"Configure the DeepSeek Key in settings first"},
   "aiStreamFailed": {"message":"AI translation failed"},
-  "aiStreamEmpty": {"message":"AI returned no translation"}
+  "aiStreamEmpty": {"message":"AI returned no translation"},
+  "aiStreamResult": {"message":"AI translation"}
 }

@@ -117,24 +117,48 @@ html.ytds-active .caption-window {
   cursor: text;
 }
 
-/* A double-clicked sentence temporarily owns the translation line. Force that
-   line visible even when the ordinary translation layer is disabled, and give
-   the live stream a quiet focus ring without changing the user's colours. */
-#ytds-overlay.ytds-ai-override .ytds-trans {
-  display: inline-block !important;
+/* Independent AI translation hover. The original cue remains exactly where it
+   was; this read-only textarea floats above it and can be selected/copied. */
+.ytds-ai-hover {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 12px);
+  z-index: 3;
+  box-sizing: border-box;
+  min-width: 240px;
+  max-width: min(82vw, 560px);
+  padding: 11px 13px;
+  transform: translateX(-50%);
+  resize: none;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 9px;
+  outline: none;
+  background: rgba(18, 18, 22, 0.94);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.42);
+  color: #fff;
+  font: 500 17px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+  text-align: left;
+  pointer-events: auto;
+  user-select: text;
+  -webkit-user-select: text;
 }
 
-#ytds-overlay.ytds-ai-override .ytds-orig {
-  display: none !important;
+.ytds-ai-hover[hidden] { display: none; }
+.ytds-ai-hover.ytds-ai-hover-below {
+  top: calc(100% + 12px);
+  bottom: auto;
 }
 
-#ytds-overlay.ytds-ai-streaming .ytds-trans {
-  box-shadow: 0 0 0 1px rgba(62, 166, 255, 0.72),
-              0 0 12px rgba(62, 166, 255, 0.22);
+#ytds-overlay.ytds-ai-streaming .ytds-ai-hover {
+  border-color: rgba(62, 166, 255, 0.78);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.42),
+              0 0 14px rgba(62, 166, 255, 0.24);
 }
 
-#ytds-overlay.ytds-ai-error .ytds-trans {
-  color: #ffb4ab !important;
+#ytds-overlay.ytds-ai-error .ytds-ai-hover {
+  border-color: rgba(255, 138, 138, 0.72);
+  color: #ffb4ab;
 }
 
 /* ---- draggable handle -------------------------------------------------- */

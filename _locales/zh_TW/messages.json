@@ -197,5 +197,6 @@
   "fontCjkRound": {"message":"中文圓體"},
   "aiStreamNoKey": {"message":"請先在設定中配置 DeepSeek Key"},
   "aiStreamFailed": {"message":"AI 翻譯失敗"},
-  "aiStreamEmpty": {"message":"AI 沒有返回譯文"}
+  "aiStreamEmpty": {"message":"AI 沒有返回譯文"},
+  "aiStreamResult": {"message":"AI 譯文"}
 }
