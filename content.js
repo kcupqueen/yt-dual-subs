@@ -425,6 +425,7 @@
 
     overlay = document.createElement("div");
     overlay.id = "ytds-overlay";
+    if (API_ONLY_MODE) overlay.classList.add("ytds-api-only");
     transEl = document.createElement("div");
     transEl.className = "ytds-line ytds-trans";
     origEl = document.createElement("div");
@@ -494,18 +495,11 @@
 
   function setAIHoverText(text) {
     if (!ensureOverlay() || !aiHoverEl) return;
-    const opening = aiHoverEl.hidden;
     aiHoverEl.hidden = false;
     aiHoverEl.value = String(text || "");
 
     const player = getPlayer();
     const playerHeight = player ? player.clientHeight : 480;
-    // Fix the width for the lifetime of this hover. Stream deltas may change
-    // its height, but never its width, so the box does not visually breathe.
-    if (opening) {
-      const playerWidth = player ? player.clientWidth : 640;
-      aiHoverEl.style.width = Math.round(playerWidth * 0.6) + "px";
-    }
     aiHoverEl.style.height = "auto";
     const wantedHeight = Math.max(58, aiHoverEl.scrollHeight + 2);
     const height = Math.min(wantedHeight, Math.max(90, playerHeight * 0.36));
@@ -533,7 +527,6 @@
     if (aiHoverEl) {
       aiHoverEl.hidden = true;
       aiHoverEl.value = "";
-      aiHoverEl.style.width = "";
       aiHoverEl.style.height = "";
       aiHoverEl.classList.remove("ytds-ai-hover-below");
     }
@@ -659,6 +652,20 @@
     handleEl.addEventListener("dblclick", onHandleDblClick);
 
     overlay.appendChild(handleEl);
+
+    // Visual-only preview for the action that will sit beside the drag grip.
+    // It deliberately ignores pointer input until its behaviour is decided.
+    const aiButton = document.createElement("button");
+    aiButton.type = "button";
+    aiButton.className = "ytds-handle-action";
+    aiButton.tabIndex = -1;
+    aiButton.setAttribute("aria-hidden", "true");
+    aiButton.innerHTML =
+      '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true">' +
+      '<path d="M8 1.5l1.25 3.25L12.5 6 9.25 7.25 8 10.5 6.75 7.25 3.5 6l3.25-1.25L8 1.5Z" fill="currentColor"/>' +
+      '<path d="M12.5 10l.65 1.35 1.35.65-1.35.65L12.5 14l-.65-1.35L10.5 12l1.35-.65L12.5 10Z" fill="currentColor"/>' +
+      '</svg><span>AI</span>';
+    overlay.appendChild(aiButton);
   }
 
   // ---- first-run discovery -------------------------------------------------

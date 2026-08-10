@@ -27,6 +27,19 @@ html.ytds-active .caption-window {
   max-width: min(92%, 1100px);
 }
 
+/* API-only layout has a stable reading measure. Percentage width resolves
+   against the player (the overlay's containing block), so sentence length can
+   no longer make the original box expand and contract. */
+#ytds-overlay.ytds-api-only {
+  width: 60%;
+  max-width: none;
+}
+
+#ytds-overlay.ytds-api-only .ytds-orig {
+  width: 100%;
+  box-sizing: border-box;
+}
+
 /* preset anchors (used when posMode === "preset") */
 #ytds-overlay.ytds-pos-bottom { bottom: 8%; top: auto; }
 #ytds-overlay.ytds-pos-center { top: 50%; bottom: auto; transform: translate(-50%, -50%); }
@@ -125,6 +138,7 @@ html.ytds-active .caption-window {
   bottom: calc(100% + 12px);
   z-index: 3;
   box-sizing: border-box;
+  width: 100%;
   padding: 11px 13px;
   transform: translateX(-50%);
   resize: none;
@@ -196,6 +210,33 @@ html.ytds-active .caption-window {
 .ytds-handle.ytds-dragging { cursor: grabbing; }
 .ytds-handle svg { width: 21px; height: 15px; display: block; pointer-events: none; }
 
+/* Visual preview only: future AI action beside the drag grip. It follows the
+   grip's visibility but does not accept input until its behaviour is wired. */
+.ytds-handle-action {
+  position: absolute;
+  top: -34px;
+  left: 50px;
+  width: 46px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.38);
+  border-radius: 8px;
+  background: rgba(8, 8, 8, 0.78);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+  color: #ffe98a;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  font: 700 10px/1 system-ui, -apple-system, "Segoe UI", sans-serif;
+  letter-spacing: .2px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .15s ease, background .15s ease, border-color .15s ease;
+  z-index: 1;
+}
+.ytds-handle-action svg { width: 13px; height: 13px; display: block; }
+
 /* While dragging, the box floats as one frosted pane: the user is moving a
    thing, not loose text. A translucent white wash was invisible over bright
    footage (a red BBC banner ate it), so this blurs what is behind it instead.
@@ -222,6 +263,7 @@ html.ytds-active .caption-window {
   animation: ytds-grip 0.85s ease-in-out 4;
   box-shadow: 0 0 14px rgba(255, 255, 255, 0.85), 0 1px 4px rgba(0, 0, 0, 0.6);
 }
+#ytds-overlay.ytds-hint .ytds-handle-action { opacity: 1; }
 /* Two swells per cycle: a single fade reads as a flicker you might have
    imagined. Scale only — position belongs to the avoidance. */
 @keyframes ytds-grip {
@@ -246,6 +288,11 @@ html.ytds-active .caption-window {
 #movie_player:not(.ytp-autohide):hover #ytds-overlay .ytds-handle,
 .html5-video-player:not(.ytp-autohide):hover #ytds-overlay .ytds-handle,
 .ytds-handle.ytds-dragging {
+  opacity: .9;
+}
+#movie_player:not(.ytp-autohide):hover #ytds-overlay .ytds-handle-action,
+.html5-video-player:not(.ytp-autohide):hover #ytds-overlay .ytds-handle-action,
+.ytds-handle.ytds-dragging ~ .ytds-handle-action {
   opacity: .9;
 }
 .ytds-handle:hover { background: rgba(20, 20, 20, 0.9); }
