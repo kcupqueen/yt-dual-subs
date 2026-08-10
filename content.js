@@ -163,6 +163,8 @@
   let aiTranslationOverride = false;
   let aiResumeVideo = null;
   let aiResumeHandler = null;
+  let wordClickTimer = null;
+  const WORD_CLICK_DELAY_MS = 280;
 
   // drag bookkeeping (listeners live on the handle, so they die with overlay)
   let dragging = false;
@@ -433,7 +435,8 @@
     origEl.addEventListener("pointerdown", stopCuePointerPropagation);
     origEl.addEventListener("pointerup", stopCuePointerPropagation);
     origEl.addEventListener("click", stopCuePointerPropagation);
-    origEl.addEventListener("dblclick", selectCurrentCue);
+    origEl.addEventListener("click", onCurrentCueClick);
+    origEl.addEventListener("dblclick", stopCuePointerPropagation);
 
     aiHoverEl = document.createElement("textarea");
     aiHoverEl.className = "ytds-ai-hover";
@@ -458,25 +461,91 @@
   }
 
   // The overlay normally lets pointer input pass through to the player. The
-  // original cue text is the exception: users may select it. A double-click
-  // keeps the browser's normal one-word selection and looks that word up using
-  // the complete current sentence as context.
+  // original cue text is the exception. A single click resolves the word under
+  // the pointer, highlights only that word, and looks it up with the complete
+  // current sentence as context. Double-click intentionally has no action.
   function stopCuePointerPropagation(e) {
     if (e.target.closest(".ytds-cue")) e.stopPropagation();
   }
 
-  function selectCurrentCue(e) {
+  function onCurrentCueClick(e) {
     const current = e.target.closest(".ytds-cue-current");
     if (!current || !origEl || !origEl.contains(current)) return;
     e.stopPropagation();
-    // Do not preventDefault: the browser performs the one-word selection. Read
-    // it in the next task, after that default action has completed.
-    setTimeout(() => {
+
+    if (wordClickTimer) {
+      clearTimeout(wordClickTimer);
+      wordClickTimer = null;
+    }
+    // A double-click emits two click events before dblclick. Delay the single
+    // click slightly; the second click cancels it, so double-click does nothing.
+    if (e.detail !== 1) return;
+    const clientX = e.clientX;
+    const clientY = e.clientY;
+    wordClickTimer = setTimeout(() => {
+      wordClickTimer = null;
       if (!current.isConnected) return;
-      const word = selectedTextWithin(current);
+      const word = selectWordAtPoint(current, clientX, clientY);
       const context = String(current.textContent || "").trim();
       if (word && context) startAIWordLookup(word, context);
-    }, 0);
+    }, WORD_CLICK_DELAY_MS);
+  }
+
+  function caretRangeAtPoint(clientX, clientY) {
+    if (document.caretRangeFromPoint) {
+      return document.caretRangeFromPoint(clientX, clientY);
+    }
+    if (document.caretPositionFromPoint) {
+      const pos = document.caretPositionFromPoint(clientX, clientY);
+      if (!pos) return null;
+      const range = document.createRange();
+      range.setStart(pos.offsetNode, pos.offset);
+      range.collapse(true);
+      return range;
+    }
+    return null;
+  }
+
+  function isWordCharacter(char) {
+    return !!char && /[\p{L}\p{N}\p{M}'’_-]/u.test(char);
+  }
+
+  function selectWordAtPoint(element, clientX, clientY) {
+    const caret = caretRangeAtPoint(clientX, clientY);
+    if (!caret || caret.startContainer.nodeType !== Node.TEXT_NODE) return "";
+    const textNode = caret.startContainer;
+    if (!element.contains(textNode)) return "";
+    const text = textNode.textContent || "";
+    if (!text) return "";
+
+    // The current cue spans the fixed 60% overlay width while its glyphs may
+    // occupy only the centre. Do not treat clicks on that empty padding as a
+    // click on the nearest first/last word.
+    const textRange = document.createRange();
+    textRange.selectNodeContents(textNode);
+    const overGlyphs = Array.from(textRange.getClientRects()).some((rect) =>
+      clientX >= rect.left && clientX <= rect.right &&
+      clientY >= rect.top && clientY <= rect.bottom
+    );
+    if (!overGlyphs) return "";
+
+    let at = Math.min(caret.startOffset, text.length - 1);
+    if (!isWordCharacter(text[at]) && at > 0 && isWordCharacter(text[at - 1])) at--;
+    if (!isWordCharacter(text[at])) return "";
+
+    let start = at;
+    let end = at + 1;
+    while (start > 0 && isWordCharacter(text[start - 1])) start--;
+    while (end < text.length && isWordCharacter(text[end])) end++;
+
+    const range = document.createRange();
+    range.setStart(textNode, start);
+    range.setEnd(textNode, end);
+    const selection = window.getSelection();
+    if (!selection) return "";
+    selection.removeAllRanges();
+    selection.addRange(range);
+    return range.toString().trim();
   }
 
   function selectedTextWithin(element) {
@@ -685,8 +754,8 @@
 
     overlay.appendChild(handleEl);
 
-    // Direct AI action beside the drag grip: pause and translate the sentence
-    // currently shown on the original line.
+    // Direct AI action beside the drag grip: explain the word/phrase currently
+    // selected on the original line, using that line as context.
     const aiButton = document.createElement("button");
     aiButton.type = "button";
     aiButton.className = "ytds-handle-action";
@@ -1012,6 +1081,7 @@
   }
 
   function removeOverlay() {
+    if (wordClickTimer) { clearTimeout(wordClickTimer); wordClickTimer = null; }
     if (dragSaveTimer) { clearTimeout(dragSaveTimer); dragSaveTimer = null; }
     dragging = false;
     if (liftObserver) { liftObserver.disconnect(); liftObserver = null; }

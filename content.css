@@ -120,6 +120,18 @@ html.ytds-active .caption-window {
   box-shadow: inset 3px 0 currentColor;
 }
 
+/* API-only interaction highlights the clicked word through Selection. The
+   complete current sentence must not look selected before the user clicks. */
+#ytds-overlay.ytds-api-only .ytds-cue-current {
+  background: transparent;
+  box-shadow: none;
+}
+
+#ytds-overlay.ytds-api-only .ytds-cue::selection {
+  background: rgba(62, 166, 255, 0.78);
+  color: #fff;
+}
+
 /* Only original cue text participates in selection. Pointer events remain
    disabled everywhere else, including the translated line, so normal player
    clicks keep passing through the overlay. */
