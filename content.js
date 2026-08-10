@@ -850,8 +850,13 @@
   function setTranslation(text, forSource) {
     if (!ensureOverlay()) return;
     if (cuePairActive) {
-      const current = text || "";
+      let current = text || "";
       let previous = cachedTranslationForCue(previousCueIdx);
+      if (Array.isArray(displayCueList)) {
+        current = stripBracketedCaptionMetadata(current);
+        previous = stripBracketedCaptionMetadata(previous);
+        if (arguments.length > 1 && !cleanEnglishDisplayText(forSource)) current = "";
+      }
       // Smart-sentence mode can intentionally reuse one whole-sentence
       // translation across several cues. Do not render that identical sentence
       // twice when the original cues themselves are different.
@@ -1062,7 +1067,8 @@
     const t = video.currentTime * 1000;
 
     const idx = activeCueIdxAt(t);
-    const displayIdx = displayCueList ? activeDisplayCueIdxAt(t) : idx;
+    const usingDisplayTimeline = Array.isArray(displayCueList);
+    const displayIdx = usingDisplayTimeline ? activeDisplayCueIdxAt(t) : idx;
 
     if (idx < 0) {
       if (activeCueIdx !== -1) {
@@ -1092,8 +1098,9 @@
     const cue = cueList[idx];
     if (displayChanged || (sourceChanged && displayIdx < 0)) {
       activeDisplayCueIdx = displayIdx;
-      const displayText = displayCueList && displayIdx >= 0
-        ? displayCueList[displayIdx].text : cue.text;
+      const displayText = usingDisplayTimeline
+        ? (displayIdx >= 0 ? displayCueList[displayIdx].text : "")
+        : cue.text;
       setOriginal(displayText);
     }
     if (sourceChanged) {
@@ -1101,8 +1108,14 @@
       // cue remains visible in its own, dimmed row instead of masquerading as the
       // translation of the newly active cue.
       setTranslation("", cue.text);
-      renderTranslationForCue(idx, cue);
-      prefetchFrom(idx);                  // warm upcoming translations (gtx mode)
+      // A cue containing only [Music]/[Applause]/etc. has no current spoken
+      // line to translate. Suppress its translated annotation as well, without
+      // changing the raw cue or any translation/cache machinery.
+      const hasSpokenText = !usingDisplayTimeline || !!cleanEnglishDisplayText(cue.text);
+      if (hasSpokenText) {
+        renderTranslationForCue(idx, cue);
+      }
+      prefetchFrom(hasSpokenText ? idx : idx + 1); // warm upcoming translations
     }
   }
 
@@ -1348,14 +1361,37 @@
       .trim();
   }
 
+  // Remove non-spoken accessibility/stage directions from the English display
+  // timeline. Raw cueList text is intentionally preserved for export/debugging.
+  // Parentheses are filtered conservatively (known sound descriptions only),
+  // while square brackets are caption metadata by convention.
+  const EN_PAREN_NOISE_RE = /\((?:music|applause|laughter|laughing|cheering|cheers|clapping|inaudible|silence|sighs?|gasps?|coughs?|sneezes?|doorbell|phone rings?|thunder|wind|footsteps?|speaking indistinctly|foreign language)(?:[^)]{0,60})\)/gi;
+
+  function stripBracketedCaptionMetadata(text) {
+    return String(text || "")
+      .replace(/\[[^\]\r\n]{1,100}\]/g, " ")
+      .replace(/【[^】\r\n]{1,100}】/g, " ")
+      .replace(/[♪♫♬♩]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  function cleanEnglishDisplayText(text) {
+    return stripBracketedCaptionMetadata(text)
+      .replace(EN_PAREN_NOISE_RE, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
   function buildEnglishDisplayCues(list) {
-    if (!Array.isArray(list) || !list.length) return null;
+    if (!Array.isArray(list) || !list.length) return [];
     const tokens = [];
     let lastTokenStart = -Infinity;
 
     for (let cueIdx = 0; cueIdx < list.length; cueIdx++) {
       const cue = list[cueIdx];
-      const words = String(cue.text || "").match(/\S+/g) || [];
+      const displayText = cleanEnglishDisplayText(cue.text);
+      const words = displayText.match(/\S+/g) || [];
       if (!words.length) continue;
       const offsets = Array.isArray(cue.wordOffsets) && cue.wordOffsets.length === words.length
         ? cue.wordOffsets : null;
@@ -1375,7 +1411,7 @@
         lastTokenStart = start;
       }
     }
-    if (!tokens.length) return null;
+    if (!tokens.length) return [];
 
     for (let i = 0; i < tokens.length; i++) {
       const source = list[tokens[i].sourceIdx];
@@ -1424,7 +1460,7 @@
         sentences[i].end = Math.max(sentences[i].end, tail.end, sentences[i].start + 1000);
       }
     }
-    return sentences.length ? sentences : null;
+    return sentences;
   }
 
   // ---- sentence groups (gtx smart-sentence mode) ---------------------------
