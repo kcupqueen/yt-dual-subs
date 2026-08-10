@@ -12,6 +12,8 @@
 //   chrome.storage.local.byoKeys.deepseek  — API key (never synced)
 //   chrome.storage.sync.targetLang         — target language
 //   chrome.storage.sync.byoModelBy          — per-provider model selection
+// In Node.js, the equivalent values come from DEEPSEEK_API_KEY, TARGET_LANG,
+// and DEEPSEEK_MODEL, so local tests do not need to mock chrome.storage.
 
 (function (root) {
   "use strict";
@@ -46,7 +48,26 @@
     });
   }
 
+  function environment() {
+    return typeof process !== "undefined" && process && process.env
+      ? process.env
+      : Object.create(null);
+  }
+
   async function readConfig(options) {
+    const env = environment();
+    const envKey = String(options.apiKey || env.DEEPSEEK_API_KEY || "").trim();
+
+    // Node/local callers use environment variables directly. Keeping this path
+    // ahead of storage also makes api.js testable without a chrome global.
+    if (envKey) {
+      return {
+        key: envKey,
+        model: String(options.model || env.DEEPSEEK_MODEL || DEFAULT_MODEL).trim(),
+        targetLang: String(options.targetLang || env.TARGET_LANG || "zh-CN").trim()
+      };
+    }
+
     const [local, sync] = await Promise.all([
       storageGet("local", { byoKeys: {} }),
       storageGet("sync", {
@@ -137,8 +158,8 @@
    * Stream a translation from DeepSeek.
    *
    * @param {string} sourceText Text to translate.
-   * @param {{targetLang?: string, model?: string, signal?: AbortSignal}} [options]
-   *        targetLang/model override stored settings only for this request.
+   * @param {{apiKey?: string, targetLang?: string, model?: string, signal?: AbortSignal}} [options]
+   *        Explicit values override environment variables or stored settings.
    * @yields {string} Each translated text delta returned by DeepSeek.
    */
   async function* translateStream(sourceText, options) {
@@ -211,5 +232,7 @@
     }
   }
 
-  root.YTDS_AI_API = Object.freeze({ translateStream });
+  const api = Object.freeze({ translateStream });
+  root.YTDS_AI_API = api;
+  if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof self !== "undefined" ? self : globalThis);
