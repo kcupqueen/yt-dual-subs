@@ -12,6 +12,7 @@
   const OPEN_DELAY = 500;
   const VIEWPORT_MARGIN = 12;
   const SELECTION_GAP = 10;
+  const HAS_ENGLISH = /[A-Za-z]/;
   const t = (key, fallback) =>
     (chrome.i18n && chrome.i18n.getMessage(key)) || fallback;
 
@@ -268,9 +269,7 @@
   }
 
   function readSelection() {
-    ensureUi();
-
-    const shadow = host.shadowRoot;
+    const shadow = host && host.shadowRoot;
     if (shadow && shadow.activeElement) return null;
 
     const active = document.activeElement;
@@ -279,7 +278,9 @@
       const end = active.selectionEnd;
       if (typeof start === "number" && typeof end === "number" && end > start) {
         const text = active.value.slice(start, end).trim();
-        if (text) return { text, rect: active.getBoundingClientRect() };
+        if (text && HAS_ENGLISH.test(text)) {
+          return { text, rect: active.getBoundingClientRect() };
+        }
       }
     }
 
@@ -287,7 +288,7 @@
     if (!selection || selection.isCollapsed || selection.rangeCount === 0) return null;
 
     const text = selection.toString().trim();
-    if (!text) return null;
+    if (!text || !HAS_ENGLISH.test(text)) return null;
 
     const range = selection.getRangeAt(0);
     if (range.commonAncestorContainer.getRootNode() === shadow) return null;
