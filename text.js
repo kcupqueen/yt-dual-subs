@@ -17,6 +17,12 @@
 
   let openTimer = 0;
   let pointerSelecting = false;
+  let pointerMoved = false;
+  let pointerStartX = 0;
+  let pointerStartY = 0;
+  let selectionAtPointerDown = "";
+  let suppressOutsideClick = false;
+  let dismissed = false;
   let targetLang = "zh-CN";
   let host = null;
   let panel = null;
@@ -248,6 +254,19 @@
     return /^(text|search|url|tel|email)$/i.test(element.type);
   }
 
+  function selectedTextOnly() {
+    const active = document.activeElement;
+    if (isTextControl(active)) {
+      const start = active.selectionStart;
+      const end = active.selectionEnd;
+      if (typeof start === "number" && typeof end === "number" && end > start) {
+        return active.value.slice(start, end).trim();
+      }
+    }
+    const selection = window.getSelection();
+    return selection ? selection.toString().trim() : "";
+  }
+
   function readSelection() {
     ensureUi();
 
@@ -415,6 +434,7 @@
 
   function show(selection) {
     ensureUi();
+    dismissed = false;
     sourceText.textContent = selection.text;
     anchorRect = {
       left: selection.rect.left,
@@ -430,6 +450,7 @@
   }
 
   function hide() {
+    dismissed = true;
     if (openTimer) {
       clearTimeout(openTimer);
       openTimer = 0;
@@ -444,29 +465,62 @@
   }
 
   function scheduleOpen() {
+    if (dismissed) return;
     if (openTimer) clearTimeout(openTimer);
     openTimer = window.setTimeout(() => {
       openTimer = 0;
       const selection = readSelection();
       if (selection) show(selection);
-      else hide();
     }, OPEN_DELAY);
   }
 
   document.addEventListener("pointerdown", (event) => {
     if (host && event.composedPath().includes(host)) return;
     pointerSelecting = true;
-    hide();
+    pointerMoved = false;
+    pointerStartX = event.clientX;
+    pointerStartY = event.clientY;
+    selectionAtPointerDown = selectedTextOnly();
+    dismissed = false;
+    if (openTimer) {
+      clearTimeout(openTimer);
+      openTimer = 0;
+    }
+  }, true);
+
+  document.addEventListener("pointermove", (event) => {
+    if (!pointerSelecting || pointerMoved) return;
+    if (Math.hypot(event.clientX - pointerStartX, event.clientY - pointerStartY) > 4) {
+      pointerMoved = true;
+    }
   }, true);
 
   document.addEventListener("pointerup", (event) => {
-    if (host && event.composedPath().includes(host)) return;
     pointerSelecting = false;
-    scheduleOpen();
+    if (host && event.composedPath().includes(host)) return;
+    const selectedNow = selectedTextOnly();
+    if (pointerMoved || (selectedNow && selectedNow !== selectionAtPointerDown)) {
+      // Browsers may emit a click after a drag-selection. Ignore that synthetic
+      // follow-up so it cannot immediately close the new translation window.
+      suppressOutsideClick = true;
+      setTimeout(() => { suppressOutsideClick = false; }, 0);
+      scheduleOpen();
+    }
   }, true);
 
   document.addEventListener("pointercancel", () => {
     pointerSelecting = false;
+    pointerMoved = false;
+    selectionAtPointerDown = "";
+    suppressOutsideClick = false;
+  }, true);
+
+  document.addEventListener("click", (event) => {
+    if (host && event.composedPath().includes(host)) return;
+    if (suppressOutsideClick) {
+      suppressOutsideClick = false;
+      return;
+    }
     hide();
   }, true);
 
@@ -484,7 +538,10 @@
       hide();
       return;
     }
-    if (event.shiftKey || event.key === "Shift") scheduleOpen();
+    if (event.shiftKey || event.key === "Shift") {
+      dismissed = false;
+      scheduleOpen();
+    }
   }, true);
 
   try {
@@ -501,8 +558,8 @@
 
   window.addEventListener("blur", () => {
     pointerSelecting = false;
-    hide();
+    pointerMoved = false;
+    suppressOutsideClick = false;
   });
-  window.addEventListener("resize", hide);
-  document.addEventListener("scroll", hide, true);
+  window.addEventListener("resize", queuePanelPlacement);
 })();
