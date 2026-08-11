@@ -200,5 +200,13 @@
   "aiStreamEmpty": {"message":"AI returned no result"},
   "aiStreamResult": {"message":"AI result"},
   "aiButtonTitle": {"message":"Pause and translate current sentence"},
-  "aiButtonAria": {"message":"Translate current sentence with AI"}
+  "aiButtonAria": {"message":"Translate current sentence with AI"},
+  "selectionDialogAria": {"message":"Translate selected text"},
+  "selectionClose": {"message":"Close"},
+  "selectionTranslating": {"message":"Translating"},
+  "selectionTranslatingEllipsis": {"message":"Translating…"},
+  "selectionDone": {"message":"Done"},
+  "selectionFailed": {"message":"Failed"},
+  "selectionEmpty": {"message":"No text selected"},
+  "selectionReload": {"message":"Reload this page to use the extension"}
 }

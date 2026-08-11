@@ -154,7 +154,7 @@ Plain vanilla JS/CSS — no build step, no dependencies.
 |---|---|
 | `inject.js` | MAIN‑world sniffer: captures the player's pot‑bearing timedtext URL, fetches cues + translation |
 | `content.js` | Overlay, cue engine, drag, control‑bar toggle, rendered‑scrape fallback |
-| `text.js` | Site-wide selected-text capture and translation-window UI (translation wiring pending) |
+| `text.js` | Site-wide selected-text capture and streaming DeepSeek translation window |
 | `background.js` | Translation service worker — three lanes: YouTube whole‑track, Google's free endpoint, and your own provider |
 | `popup.html/.css/.js` | Settings UI with live preview |
 | `options.html/.js` | Settings page: getting started, provider setup, language management, about |

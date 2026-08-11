@@ -200,5 +200,13 @@
   "aiStreamEmpty": {"message":"AI 没有返回结果"},
   "aiStreamResult": {"message":"AI 结果"},
   "aiButtonTitle": {"message":"暂停并翻译当前句子"},
-  "aiButtonAria": {"message":"使用 AI 翻译当前句子"}
+  "aiButtonAria": {"message":"使用 AI 翻译当前句子"},
+  "selectionDialogAria": {"message":"翻译选中文字"},
+  "selectionClose": {"message":"关闭"},
+  "selectionTranslating": {"message":"翻译中"},
+  "selectionTranslatingEllipsis": {"message":"正在翻译…"},
+  "selectionDone": {"message":"完成"},
+  "selectionFailed": {"message":"失败"},
+  "selectionEmpty": {"message":"没有选中文字"},
+  "selectionReload": {"message":"请刷新页面后重新使用扩展"}
 }

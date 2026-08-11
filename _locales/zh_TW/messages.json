@@ -200,5 +200,13 @@
   "aiStreamEmpty": {"message":"AI 沒有返回結果"},
   "aiStreamResult": {"message":"AI 結果"},
   "aiButtonTitle": {"message":"暫停並翻譯當前句子"},
-  "aiButtonAria": {"message":"使用 AI 翻譯當前句子"}
+  "aiButtonAria": {"message":"使用 AI 翻譯當前句子"},
+  "selectionDialogAria": {"message":"翻譯選取文字"},
+  "selectionClose": {"message":"關閉"},
+  "selectionTranslating": {"message":"翻譯中"},
+  "selectionTranslatingEllipsis": {"message":"正在翻譯…"},
+  "selectionDone": {"message":"完成"},
+  "selectionFailed": {"message":"失敗"},
+  "selectionEmpty": {"message":"沒有選取文字"},
+  "selectionReload": {"message":"請重新整理頁面後再使用擴充功能"}
 }

@@ -1,6 +1,6 @@
 # Privacy Policy — Dual Subtitles for YouTube™
 
-**Effective date:** 27 July 2026
+**Effective date:** 11 August 2026
 **Extension:** Dual Subtitles for YouTube™ (Chrome / Chromium browser extension)
 **Developer:** Gythiro · Source code: https://github.com/Gythiro/yt-dual-subs
 
@@ -44,9 +44,9 @@ Only the caption text of the video you are actively watching is transmitted, and
 
 **One exception, and it is announced before it happens:** when you export a video's subtitles as an SRT file *and* tick "translate with my own key", the **whole caption track** of that video is sent to your provider — not just the part you have watched. The extension shows you how many requests that will take and asks you to confirm before anything is sent, and the option is off by default.
 
-### 3. Text you select on web pages (processed locally only)
+### 3. Text you select on web pages (sent to DeepSeek only to translate)
 
-The selection-translation window reads text only after you actively select it on a web page. In the current UI-only version, that selected text is displayed locally in the page and is **not stored or transmitted anywhere**. A future version will update this policy before connecting the selection window to any translation service.
+The selection-translation window reads text only after you actively select it on a web page. After the window opens, that selected text is sent directly from the extension to **DeepSeek**, using the DeepSeek API key you configured, solely to obtain the translation shown in the window. The text and translation are not logged or stored by the extension, and the developer never receives them. Closing the window or selecting different text cancels the current request.
 
 ### 4. Your own API key (optional)
 
@@ -59,7 +59,7 @@ If you choose to use your own translation provider, the key you enter is stored 
 - **`storage`** — to save your subtitle preferences locally (see above), and an API key you choose to add.
 - **Host access to HTTP and HTTPS web pages** (content scripts) — to detect text that you actively select and display the local selection-translation window. On `www.youtube.com`, this access is also used to display the bilingual subtitle overlay and read the active caption track of the video you are watching.
 - **Host access to `translate.googleapis.com`** — to fetch machine translations of caption text for the Smart-sentences engine (used automatically when YouTube's own track translation is unavailable, or when selected manually).
-- **Optional host access to translation providers** — the extension ships with access to none of them. Each provider's domain is listed as an *optional* host permission, and Chrome asks you to grant exactly one of them at the moment you press "Save and test" for that provider. A provider you never choose is never contacted and never granted anything.
+- **Optional host access to translation providers** — the extension ships with access to none of them. Each provider's domain is listed as an *optional* host permission, and Chrome asks you to grant it when you save and test that provider. The selection-translation window specifically uses DeepSeek and therefore works only after its API key and host permission have been configured.
 
 The extension requests the permissions needed for these features and nothing more. It does not request access to your tabs or browsing history, and it does not inspect page content other than text you actively select (plus the active caption track on YouTube).
 
@@ -67,7 +67,7 @@ The extension requests the permissions needed for these features and nothing mor
 
 ## Data sharing
 
-No user data is sold or shared with third parties. The only outbound data is caption text, sent to the translation service **you** have chosen — YouTube's own translation or Google Translate by default, or your own provider if you configured one — **exclusively to produce the translation you asked for.** Your API key travels with those requests as their authorization header and nowhere else.
+No user data is sold or shared with third parties. Outbound text consists only of active YouTube captions sent to the configured caption-translation service, and text you actively select sent to DeepSeek for the selection translation. Both are sent **exclusively to produce the translation you asked for.** Your API key travels with those requests as their authorization header and nowhere else.
 
 ---
 
