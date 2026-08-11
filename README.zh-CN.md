@@ -154,6 +154,7 @@ YouTube 的字幕来自 `/api/timedtext` 接口，如今每次请求都需要一
 |---|---|
 | `inject.js` | 主世界嗅探：抓取播放器带 `pot` 的 timedtext URL，取 cue + 译文 |
 | `content.js` | 覆盖层、cue 引擎、拖动、控制栏开关、读屏回退 |
+| `text.js` | 全站选中文字捕获与翻译浮窗 UI（翻译功能待接入） |
 | `background.js` | 翻译 service worker —— 三条车道：YouTube 整轨、Google 免费接口、你自己的服务商 |
 | `popup.html/.css/.js` | 带实时预览的设置界面 |
 | `options.html/.js` | 独立设置页：新手入门、服务商配置、语言管理、关于 |

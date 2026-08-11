@@ -45,6 +45,12 @@
       "css": ["content.css"],
       "run_at": "document_idle",
       "all_frames": false
+    },
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "js": ["text.js"],
+      "run_at": "document_idle",
+      "all_frames": true
     }
   ],
   "action": {

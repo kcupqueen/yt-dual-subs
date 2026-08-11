@@ -44,7 +44,11 @@ Only the caption text of the video you are actively watching is transmitted, and
 
 **One exception, and it is announced before it happens:** when you export a video's subtitles as an SRT file *and* tick "translate with my own key", the **whole caption track** of that video is sent to your provider — not just the part you have watched. The extension shows you how many requests that will take and asks you to confirm before anything is sent, and the option is off by default.
 
-### 3. Your own API key (optional)
+### 3. Text you select on web pages (processed locally only)
+
+The selection-translation window reads text only after you actively select it on a web page. In the current UI-only version, that selected text is displayed locally in the page and is **not stored or transmitted anywhere**. A future version will update this policy before connecting the selection window to any translation service.
+
+### 4. Your own API key (optional)
 
 If you choose to use your own translation provider, the key you enter is stored with `chrome.storage.local` **on that machine only**. It is deliberately **not** put in `chrome.storage.sync`, so it is never uploaded to your browser account or copied to your other devices. It is used for one thing: the authorization header of requests to the endpoint you selected. It is never sent to the developer — there is no server to send it to — and it is never shared with any other provider. Clearing it in the settings page removes it from the machine.
 
@@ -53,11 +57,11 @@ If you choose to use your own translation provider, the key you enter is stored 
 ## Permissions and why they are needed
 
 - **`storage`** — to save your subtitle preferences locally (see above), and an API key you choose to add.
-- **Host access to `www.youtube.com`** (content scripts) — to display the bilingual subtitle overlay inside the YouTube player and read the active caption track of the video you are watching.
+- **Host access to HTTP and HTTPS web pages** (content scripts) — to detect text that you actively select and display the local selection-translation window. On `www.youtube.com`, this access is also used to display the bilingual subtitle overlay and read the active caption track of the video you are watching.
 - **Host access to `translate.googleapis.com`** — to fetch machine translations of caption text for the Smart-sentences engine (used automatically when YouTube's own track translation is unavailable, or when selected manually).
 - **Optional host access to translation providers** — the extension ships with access to none of them. Each provider's domain is listed as an *optional* host permission, and Chrome asks you to grant exactly one of them at the moment you press "Save and test" for that provider. A provider you never choose is never contacted and never granted anything.
 
-The extension requests the narrowest permissions needed for these features and nothing more. It does not request access to your tabs, browsing history, or any other websites.
+The extension requests the permissions needed for these features and nothing more. It does not request access to your tabs or browsing history, and it does not inspect page content other than text you actively select (plus the active caption track on YouTube).
 
 ---
 
